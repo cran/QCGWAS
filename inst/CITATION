@@ -1,0 +1,8 @@
+citHeader("To cite the QCGWAS package in publications, please use:")
+
+citEntry(entry = "Unpublished",
+         title = "QCGWAS: A flexible R package for automated quality control of Genome-Wide Association results",
+        author = "Peter J. van der Most, Ahmad Vaez, Bram Prins, M. Loretto Munoz, Harold Snieder, Behrooz Z. Alizadeh and Ilja M. Nolte",
+          note = "In preparation",
+   textVersion = "Van der Most, P.J., Vaez, A., Prins, B.P., Munoz, M.L., Snieder, H., Alizadeh, B.Z. & Nolte, I.M. (In preparation). QCGWAS: A flexible R package for automated quality control of Genome-Wide Association results."
+)
