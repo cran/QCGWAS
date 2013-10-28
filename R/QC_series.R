@@ -117,8 +117,8 @@ function(data_files, datafile_tag, output_filenames,
           if(missing(allele_name_std)) allele_name_std <- substr(allele_ref_std, 1L, nchar(allele_ref_std) - 6L)
           refs_name <- allele_ref_std
           refs_check <- load(paste(dir_references, allele_ref_std, sep = "/"))
-          if(!"allele_ref_std" %in% refs_check) stop(paste("no object with name 'allele_ref_std' inside", refs_name,
-                                                           ". The standard allele ref must have the object-name 'alele_ref_std', otherwise it cannot load."))
+          if(!"allele_ref_std" %in% refs_check) stop(paste0("no object with name 'allele_ref_std' inside ", refs_name,
+                                                            ". The standard allele ref must have the object-name 'alele_ref_std', otherwise it cannot load."))
           if(length(refs_check) > 1L) print(paste(" - - WARNING:", refs_name, "contains more than one object. This may affect the running of the QC."), quote = FALSE)
         } else {
           if(missing(allele_name_std)) allele_name_std <- remove_extension(allele_ref_std)
@@ -150,8 +150,8 @@ function(data_files, datafile_tag, output_filenames,
           if(missing(allele_name_alt)) allele_name_alt <- substr(allele_ref_alt, 1L, nchar(allele_ref_alt) - 6L)
           refa_name <- allele_ref_alt
           refa_check<- load(paste(dir_references, allele_ref_alt, sep = "/"))
-          if(!"allele_ref_alt" %in% refa_check) stop(paste("no object with name 'allele_ref_alt' inside", refa_name,
-                                                           ". The alternative allele reference must have the object-name 'alele_ref_alt', otherwise it cannot load."))
+          if(!"allele_ref_alt" %in% refa_check) stop(paste0("no object with name 'allele_ref_alt' inside ", refa_name,
+                                                            ". The alternative allele reference must have the object-name 'alele_ref_alt', otherwise it cannot load."))
           if(length(refa_check) > 1L) print(paste(" - - WARNING:", refa_name, "contains more than one object. This may affect the running of the QC."), quote = FALSE)
         } else {
           if(missing(update_savename)) update_savename <- remove_extension(allele_ref_alt)
@@ -182,13 +182,13 @@ function(data_files, datafile_tag, output_filenames,
     if(!dir.create(path = dir_output, showWarnings = TRUE, recursive = TRUE)) stop("Unable to create output directory")
     if(!file.exists(dir_output)) stop("Output directory was created but misnamed. Check the dir_output argument for unconventional characters or trailing spaces.")
   }
-  print(paste(" - Results saved in ", dir_output, sep=""), quote=FALSE)	
+  print(paste0(" - Results saved in ", dir_output), quote=FALSE)	
   
   # Creating tables to store the results	
   QC_checklist <- data.frame(files =
                                c(	"Filename", "Samplesize N",
                                   "Lambda", "> Lambda - genotyped", "> Lambda - imputed",
-                                  "SNPs in input file", "> monomorphic", ">> identical alleles *", "> chr Y/M",
+                                  "SNPs in input file", "> monomorphic", ">> identical alleles *", "> excluded chromosomes",
                                   "SNPs pre-QC",	"> unusable",
                                   "SNPs mid-QC",	"> allele mismatch",
                                   "SNPs post-QC", "> % QC-removed **", "> % invalid", "> % genotyped", "> % imputed",
@@ -204,11 +204,11 @@ function(data_files, datafile_tag, output_filenames,
   if(plot_effectsizes) { table_ES <- data.frame(matrix(data = 0, nrow = 1000, ncol = fileN)) }
   if(save_filtersettings) {
     table_filter <- data.frame(file = data_files,
-                               filter_FRQ = vector(mode = "numeric", length = fileN), filter_HWE = vector(mode = "numeric", length = fileN),
-                               filter_cal = vector(mode = "numeric", length = fileN), filter_imp = vector(mode = "numeric", length = fileN),
-                               FRQ_NA = vector(mode = "logical", length = fileN), HWE_NA = vector(mode = "logical", length = fileN),
-                               cal_NA = vector(mode = "logical", length = fileN), imp_NA = vector(mode = "logical", length = fileN),
-                               ignore_impstatus = vector(mode = "logical", length = fileN), stringsAsFactors = FALSE) }
+                               filter_FRQ = numeric(length = fileN), filter_HWE = numeric(length = fileN),
+                               filter_cal = numeric(length = fileN), filter_imp = numeric(length = fileN),
+                               FRQ_NA = logical(length = fileN), HWE_NA = logical(length = fileN),
+                               cal_NA = logical(length = fileN), imp_NA = logical(length = fileN),
+                               ignore_impstatus = logical(length = fileN), stringsAsFactors = FALSE) }
   all_ref_updated <- FALSE
   
   # Running the actual QC
@@ -246,7 +246,7 @@ function(data_files, datafile_tag, output_filenames,
         "", "", "", "" )
       if(resultsI$all_ref_changed) {
         if(!all_ref_updated) {
-          update_savename_full <- paste(dir_references, "/", update_savename, if(update_as_rdata) ".RData" else ".txt", sep = "")
+          update_savename_full <- paste0(dir_references, "/", update_savename, if(update_as_rdata) ".RData" else ".txt")
           backup_alt <- FALSE # so that only a single back-up is made
           all_ref_updated <- TRUE
         }
@@ -352,7 +352,7 @@ function(data_files, datafile_tag, output_filenames,
       if(plot_effectsizes) {
         print(" - Creating combined effect-size boxplot", quote = FALSE)
         flush.console()
-        plot_distribution(data_table = table_ES, names = paste(label_names, "; N =", table_plot$N, sep = ""),
+        plot_distribution(data_table = table_ES, names = paste0(label_names, "; N =", table_plot$N),
                           include = table_plot$QC_succes, plot_order = table_plot$N,
                           quantile_lines = TRUE, save_name = "Checkgraph_effect-size", save_dir = dir_output,
                           ylim = lim_effectsizes, las = 0,

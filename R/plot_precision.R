@@ -7,7 +7,7 @@ function(SE, N, labels = NULL,
     plot_table$SE <- 1/plot_table$SE
     plot_table$N <- sqrt(plot_table$N)
     
-    jpeg(paste(save_dir, "/", save_name, ".jpg", sep = "") )
+    png(paste0(save_dir, "/", save_name, ".png") )
     plot(plot_table$N, plot_table$SE, main = "Precision by Sample Size", xlab = "sqrt(sample size)", ylab = "1 / median(SE)", ...)
     if(!is.null(labels)) text(plot_table$N, plot_table$SE, labels = plot_table$la, pos = 4)
     dev.off()

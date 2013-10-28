@@ -1,6 +1,6 @@
 histogram_series <-
 function(
-  dataset, data_col = 1, save_name = paste("dataset_F", 1:nrow(plot_table), sep = ""), save_dir = getwd(), export_outliers = FALSE,
+  dataset, data_col = 1, save_name = paste0("dataset_F", 1:nrow(plot_table)), save_dir = getwd(), export_outliers = FALSE,
   filter_FRQ = NULL, filter_cal = NULL, filter_HWE = NULL, filter_imp = NULL,
   filter_NA = TRUE, filter_NA_FRQ = filter_NA, filter_NA_cal = filter_NA, filter_NA_HWE = filter_NA, filter_NA_imp = filter_NA,
   breaks = "Sturges", 
@@ -82,7 +82,7 @@ function(
                            NA_FRQ = filter_NA_FRQ, NA_cal = filter_NA_cal, NA_HWE = filter_NA_HWE, NA_imp = filter_NA_imp,
                            stringsAsFactors = FALSE)
   if(length(save_name) < nrow(plot_table)) {
-    plot_table$name <- paste(save_name, 1:nrow(plot_table), sep = "")
+    plot_table$name <- paste0(save_name, 1:nrow(plot_table))
   } else {  plot_table$name <- save_name }
   
   

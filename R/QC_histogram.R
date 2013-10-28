@@ -132,7 +132,7 @@ function(
     min_N <- 0L
     max_N <- 0L
     
-    jpeg(paste(save_dir, "/", save_name, ".jpg", sep = ""), width = 1440, height = 480)
+    png(paste0(save_dir, "/", save_name, ".png"), width = 1440, height = 480)
     par(mfrow = c(1, 2))
     (( h1<-hist(mean(dataset[goodOnes, data_col]) + (qnorm(ppoints(goodN)) * sd(dataset[goodOnes, data_col])),
                 freq = FALSE, plot = TRUE, main = paste("Expected distribution of", graph_name), xlab = graph_name, breaks = breaks, sub = save_name, font.sub = 3, ...) ))
@@ -162,10 +162,10 @@ function(
     if(export_outliers > 0L & min_N + max_N > 0L) {
       if(min_N + max_N <= export_outliers | export_outliers == 1) {
         write.table(dataset[goodOnes & (dataset[ , data_col] < minbreaks | dataset[ , data_col] > maxbreaks), ],
-                    paste(save_dir, "/", save_name, ".txt", sep = ""), col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+                    paste0(save_dir, "/", save_name, ".txt"), col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
       } else {
         write.table(dataset[goodOnes & (dataset[ , data_col] < minbreaks | dataset[ , data_col] > maxbreaks), ][1:export_outliers, ],
-                    paste(save_dir, "/", save_name, ".txt", sep = ""), col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+                    paste0(save_dir, "/", save_name, ".txt"), col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
   } } }
   return(invisible())
 }

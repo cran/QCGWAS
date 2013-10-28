@@ -2,6 +2,7 @@ filter_GWAS <-
 function(ini_file,
                         GWAS_files,
                         output_names,
+                        gzip_output = TRUE,
                         
                         dir_GWAS = getwd(),
                         dir_output = dir_GWAS,
@@ -27,23 +28,25 @@ function(ini_file,
   # Checking input arguments
   
   stopifnot(is.character(dir_GWAS), length(dir_GWAS) == 1L, is.character(dir_output), length(dir_output) == 1L)
-  if(!file.exists(dir_GWAS)) { stop("Cannot find folder 'dir_GWAS'") }
-  if(!file.exists(dir_output)) { stop("Cannot find folder 'dir_output'") }
+  if(!file.exists(dir_GWAS)) stop("Cannot find folder 'dir_GWAS'")
+  if(!file.exists(dir_output)) stop("Cannot find folder 'dir_output'")
+  stopifnot(is.logical(gzip_output), length(gzip_output) == 1L)
+  if(is.na(gzip_output)) stop("'gzip_output' cannot be NA")
   stopifnot(is.logical(header), length(header) == 1L)
-  if(is.na(header))  { stop("'header' cannot be NA") }
+  if(is.na(header)) stop("'header' cannot be NA")
   stopifnot(is.numeric(nrows), length(nrows) == 1L)
-  if(is.na(nrows) | nrows == 0) {  stop("'nrows' cannot be missing or zero") } 
+  if(is.na(nrows) | nrows == 0) stop("'nrows' cannot be missing or zero")
   stopifnot(is.numeric(nrows_test), length(nrows_test) == 1L)
-  if(is.na(nrows_test) | nrows_test == 0) { stop("'nrows_test' cannot be missing or zero") } 
+  if(is.na(nrows_test) | nrows_test == 0) stop("'nrows_test' cannot be missing or zero")
   stopifnot(is.character(comment.char), length(comment.char) == 1L)
-  if(nchar(comment.char) != 1L & nchar(comment.char) != 0L) { stop("'comment.char' must be a single character or empty string") }
+  if(nchar(comment.char) != 1L & nchar(comment.char) != 0L) stop("'comment.char' must be a single character or empty string")
   
   stopifnot(is.character(na.strings), is.character(column_separators),
             is.logical(check_impstatus), length(check_impstatus) == 1L,
             !is.na(check_impstatus))
   if(check_impstatus){
     stopifnot(is.character(imputed_T), is.character(imputed_F), is.character(imputed_NA))
-    if(any(duplicated(c(imputed_T, imputed_F, imputed_NA)))) { stop("duplicate strings in the 'imputed' arguments") }
+    if(any(duplicated(c(imputed_T, imputed_F, imputed_NA)))) stop("duplicate strings in the 'imputed' arguments")
   }
   
   stopifnot(is.logical(out_quote), length(out_quote) == 1L,
@@ -52,28 +55,27 @@ function(ini_file,
             is.character(out_na),  length(out_na) == 1L,
             is.character(out_dec), length(out_dec) == 1L,
             is.character(out_qmethod), length(out_qmethod) == 1L)
-  if(is.na(out_quote)) { stop("'out_quote' cannot be NA") }
-  if(nchar(out_sep) == 0L) { stop("'out_sep' cannot be an empty character-string") }
-  if(nchar(out_eol) == 0L) { stop("'out_eol' cannot be an empty character-string") }
-  if(nchar(out_dec) != 1L) { stop("'out_dec' must be of length 1") }
-  if(!out_qmethod %in% c("escape", "double", "e", "d")) { stop("'out_qmethod' must be either 'escape' or 'double'") }
+  if(is.na(out_quote)) stop("'out_quote' cannot be NA")
+  if(nchar(out_sep) == 0L) stop("'out_sep' cannot be an empty character-string")
+  if(nchar(out_eol) == 0L) stop("'out_eol' cannot be an empty character-string")
+  if(nchar(out_dec) != 1L) stop("'out_dec' must be of length 1")
+  if(!out_qmethod %in% c("escape", "double", "e", "d")) stop("'out_qmethod' must be either 'escape' or 'double'")
   
   stopifnot(is.logical(remove_X), length(remove_X) == 1L,
             is.logical(remove_Y), length(remove_Y) == 1L,
             is.logical(remove_XY), length(remove_XY) == 1L,
             is.logical(remove_M), length(remove_M) == 1L)
-  if(is.na(remove_X)) { stop( "'remove_X' cannot be NA") }
-  if(is.na(remove_Y)) { stop( "'remove_Y' cannot be NA") }
-  if(is.na(remove_XY)){ stop("'remove_XY' cannot be NA") }
-  if(is.na(remove_M)) { stop( "'remove_M' cannot be NA") }
+  if(is.na(remove_X)) stop( "'remove_X' cannot be NA")
+  if(is.na(remove_Y)) stop( "'remove_Y' cannot be NA")
+  if(is.na(remove_XY))stop("'remove_XY' cannot be NA")
+  if(is.na(remove_M)) stop( "'remove_M' cannot be NA")
   
   if(missing(header_translations)) {    
     check_header <- FALSE  
   } else {
     if(is.character(header_translations) & !is.matrix(header_translations)) {
       if(length(header_translations) != 1L & nchar(header_translations) < 3L) {
-        stop("'header_translations' is neither a table nor a filename")
-      }
+        stop("'header_translations' is neither a table nor a filename") }
       print(paste("Loading 'header_translations' from file:", header_translations), quote = FALSE)
       if(file.exists(paste(dir_GWAS, header_translations, sep = "/"))) {
         header_translations <- read.table(paste(dir_GWAS, header_translations, sep = "/"), stringsAsFactors = FALSE)
@@ -83,28 +85,33 @@ function(ini_file,
         } else { stop("Cannot find 'header_translations'")}
       }
     }
-    if(!is.data.frame(header_translations) & !is.matrix(header_translations)) { stop("'header_translations' is not a table") }
-    if(ncol(header_translations) != 2L) { stop("'header_translations' does not have two columns") }
-    if(any(duplicated(header_translations[,2]))) { stop("'header_translations' contains duplicated elements in column 2") }
+    if(!is.data.frame(header_translations) & !is.matrix(header_translations)) stop("'header_translations' is not a table")
+    if(ncol(header_translations) != 2L) stop("'header_translations' does not have two columns")
+    if(any(duplicated(header_translations[,2]))) stop("'header_translations' contains duplicated elements in column 2")
     check_header <- TRUE
   }
   
   out_header_type <- "table"
   if(is.character(out_header) & !is.matrix(out_header)) {
-    if(length(out_header) != 1L | nchar(out_header) < 3L) {
-      stop("'out_header' is neither a table nor a filename")
-    }
-    if(out_header %in% c("original", "standard", "GWAMA", "PLINK", "META", "old")) {
+    if(length(out_header) != 1L | nchar(out_header) < 3L) stop("'out_header' is neither a table nor a filename")
+    if(out_header %in% c("original", "standard", "GWAMA", "PLINK", "META", "GenABEL", "old")) {
       out_header_type <- out_header
       if(out_header_type != "standard" & out_header_type != "original") {
-        out_header <- data.frame(
-          GWAMA = c("MARKER", "CHR", "POSITION", "EA", "NEA", "STRAND", "BETA", "SE", "P", "EAF", "N", "IMPUTED", "IMP_QUALITY"),
-          PLINK = c("SNP",    "CHR", "BP",       "A1", "A2",  "STRAND", "BETA", "SE", "P", "EFF_ALL_FREQ", "N", "IMPUTED", "IMP_QUALITY"),
-          META = c( "rsid",   "chr", "pos",      "allele_B", "allele_A", "strand", "beta", "se", "P_value", "EFF_ALL_FREQ", "N", "imputed", "info"),
-          old =c("MARKER", "CHR", "POSITION", "ALLELE1",    "ALLELE2",   "STRAND", "EFFECT", "STDERR", "PVALUE", "FREQLABEL",    "N_TOTAL", "IMPUTED", "IMP_QUALITY"),
-          QC = c("MARKER", "CHR", "POSITION", "EFFECT_ALL", "OTHER_ALL", "STRAND", "EFFECT", "STDERR", "PVALUE", "EFF_ALL_FREQ", "N_TOTAL", "IMPUTED", "IMP_QUALITY"),
-          stringsAsFactors = FALSE)
-        out_header <- out_header[ ,c(out_header_type, "QC")]
+        if(out_header_type == "GenABEL"){
+          out_header <- data.frame(
+            GenABEL = c("name", "chromosome", "position", "strand", "allele1", "allele2", "effallelefreq", "n", "beta", "sebeta", "p", "pexhwe", "call"),
+            QC = c("MARKER", "CHR", "POSITION", "STRAND", "EFFECT_ALL", "OTHER_ALL", "EFF_ALL_FREQ", "N_TOTAL", "EFFECT", "STDERR", "PVALUE", "HWE_PVAL", "CALLRATE"),
+            stringsAsFactors = FALSE)
+        } else {
+          out_header <- data.frame(
+            GWAMA = c("MARKER", "CHR", "POSITION", "EA", "NEA", "STRAND", "BETA", "SE", "P", "EAF", "N", "IMPUTED", "IMP_QUALITY"),
+            PLINK = c("SNP",    "CHR", "BP",  		 "A1", "A2",	"STRAND", "BETA", "SE", "P", "EFF_ALL_FREQ", "N", "IMPUTED", "IMP_QUALITY"),
+            META = c( "rsid",	 "chr", "pos",			"allele_B", "allele_A", "strand", "beta", "se", "P_value", "EFF_ALL_FREQ", "N", "imputed", "info"),
+            old =c("MARKER", "CHR", "POSITION", "ALLELE1",		"ALLELE2",	 "STRAND", "EFFECT", "STDERR", "PVALUE", "FREQLABEL",		"N_TOTAL", "IMPUTED", "IMP_QUALITY"),
+            QC = c("MARKER", "CHR", "POSITION", "EFFECT_ALL", "OTHER_ALL", "STRAND", "EFFECT", "STDERR", "PVALUE", "EFF_ALL_FREQ", "N_TOTAL", "IMPUTED", "IMP_QUALITY"),
+            stringsAsFactors = FALSE)
+          out_header <- out_header[ ,c(out_header_type, "QC")]
+        }
       }
     } else {
       print(paste("Loading 'out_header' from file:", out_header), quote = FALSE)
@@ -118,9 +125,9 @@ function(ini_file,
   }
   if(out_header_type == "table") {
     if(is.matrix(out_header) | is.data.frame(out_header)) {
-      if(ncol(out_header) != 2L) { stop("'out_header' does not have 2 columns") }
-      if(any(is.na(out_header))) { stop("'out_header' contains missing values") }
-      if(any(duplicated(out_header[,1]),duplicated(out_header[,2]))) { stop("'out_header' contains duplicated names") }
+      if(ncol(out_header) != 2L) stop("'out_header' does not have 2 columns")
+      if(any(is.na(out_header))) stop("'out_header' contains missing values")
+      if(any(duplicated(out_header[,1]),duplicated(out_header[,2]))) stop("'out_header' contains duplicated names")
     } else { stop("'out_header' is not a table or a data-frame") } }
   
   
@@ -143,10 +150,10 @@ function(ini_file,
       }
     } else {
       ini_check <- FALSE
-      if(!is.character(GWAS_files)){ stop("'GWAS_files' is not a character string or vector") }
-      if(length(GWAS_files) == 1L) { GWAS_files <- list.files(path = dir_GWAS, pattern = GWAS_files) }
+      if(!is.character(GWAS_files)) stop("'GWAS_files' is not a character string or vector")
+      if(length(GWAS_files) == 1L) GWAS_files <- list.files(path = dir_GWAS, pattern = GWAS_files)
       file_N <- length(GWAS_files)
-      if(file_N == 0L) { stop("'GWAS_files' does not point to existing files")}
+      if(file_N == 0L) stop("'GWAS_files' does not point to existing files")
       
       stopifnot(is.logical(FRQ_NA),
                 is.logical(HWE_NA),
@@ -182,25 +189,25 @@ function(ini_file,
         FRQ_NA <- FALSE
       } else {
         if(!is.vector(FRQ_HQ)) stop("'FRQ_HQ' must be a vector")
-        if(!is.numeric(FRQ_HQ) & !all(is.na(FRQ_HQ))) { stop("'FRQ_HQ' isn't a numerical or NA value") } }
+        if(!is.numeric(FRQ_HQ) & !all(is.na(FRQ_HQ))) stop("'FRQ_HQ' isn't a numerical or NA value") }
       if(is.null(HWE_HQ)) {
         HWE_HQ <- NA
         HWE_NA <- FALSE
       } else {
         if(!is.vector(HWE_HQ)) stop("'HWE_HQ' must be a vector")
-        if(!is.numeric(HWE_HQ) & !all(is.na(HWE_HQ))) { stop("'HWE_HQ' isn't a numerical or NA value") } }
+        if(!is.numeric(HWE_HQ) & !all(is.na(HWE_HQ))) stop("'HWE_HQ' isn't a numerical or NA value") }
       if(is.null(cal_HQ)) {
         cal_HQ <- NA
         cal_NA <- FALSE
       } else {
         if(!is.vector(cal_HQ)) stop("'cal_HQ' must be a vector")
-        if(!is.numeric(cal_HQ) & !all(is.na(cal_HQ))) { stop("'cal_HQ' isn't a numerical or NA value") } }
+        if(!is.numeric(cal_HQ) & !all(is.na(cal_HQ))) stop("'cal_HQ' isn't a numerical or NA value") }
       if(is.null(imp_HQ)) {
         imp_HQ <- NA
         imp_NA <- FALSE
       } else {
         if(!is.vector(imp_HQ)) stop("'imp_HQ' must be a vector")
-        if(!is.numeric(imp_HQ) & !all(is.na(imp_HQ))) { stop("'imp_HQ' isn't a numerical or NA value") } }
+        if(!is.numeric(imp_HQ) & !all(is.na(imp_HQ))) stop("'imp_HQ' isn't a numerical or NA value") }
       
       if(length(FRQ_HQ) != 1L & length(FRQ_HQ) != file_N) {
         if(file_N %% length(FRQ_HQ) == 0L & length(FRQ_HQ) < file_N) {
@@ -285,12 +292,12 @@ function(ini_file,
   print(paste(" -", 1:file_N, ini_file$file), quote = FALSE)
   print("", quote = FALSE)
   
-  return_list <- vector(mode = "logical", length = file_N)
+  return_list <- logical(length = file_N)
   use_Chr <- remove_X | remove_Y | remove_XY | remove_M
   
   for(fi in 1:file_N){
     print("", quote = FALSE)
-    print(paste("Loading ", ini_file$file[fi], " - (", fi, "/", file_N, ")", sep = ""), quote = FALSE)
+    print(paste0("Loading ", ini_file$file[fi], " - (", fi, "/", file_N, ")"), quote = FALSE)
     flush.console()
     dataI <- load_GWAS(filename = ini_file$file[fi], dir = dir_GWAS,
                        column_separators = column_separators, test_nrows = nrows_test,
@@ -392,8 +399,24 @@ function(ini_file,
                                          standard = out_header[,1], alternative = out_header)
           if(header_out$missing_N > 0L) { print(paste("Unable to translate column(s)", paste(header_out$missing_h, collapse = ", ")), quote = FALSE) }
           colnames(dataI) <- header_out$header_h
+
+          if(out_header_type == "GenABEL") {
+            if(!"build" %in% header_out$unknown_h) dataI$build <- as.factor("unknown")
+            dataI$effallele <- as.factor(dataI$allele1)
+            if(!"pgc" %in% header_out$unknown_h) dataI$pgc <- NA
+            if(!"lambda.estimate" %in% header_out$unknown_h) dataI$lambda.estimate <- NA
+            if(!"lambda.se" %in% header_out$unknown_h) dataI$lambda.se <- NA
+            
+            dataI <- dataI[ , c("name", "chromosome", "position", "strand",
+                                "allele1", "allele2", "build", "effallele",
+                                "effallelefreq", "n", "beta", "sebeta", "p",
+                                "pgc", "lambda.estimate", "lambda.se",
+                                "pexhwe", "call")]
+          }
       } }
-      write.table(dataI, paste(dir_output, ini_file$out_name[fi], sep = "/"),
+      
+      write.table(dataI,
+                  if(gzip_output) gzfile(paste0(dir_output, "/", ini_file$out_name[fi], ".gz")) else paste(dir_output, ini_file$out_name[fi], sep = "/"),
                   quote = out_quote, sep = out_sep, eol = out_eol, na = out_na, dec = out_dec,
                   row.names = out_rownames, col.names = out_colnames, qmethod = out_qmethod)
       return_list[fi] <- TRUE

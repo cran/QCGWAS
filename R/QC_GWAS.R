@@ -1,5 +1,5 @@
 QC_GWAS <-
-function(filename, filename_output = paste("QC_", filename, sep = ""),
+function(filename, filename_output = paste0("QC_", filename),
                     dir_data = getwd(), dir_output = paste(dir_data, "QCGWASed", sep="/"), dir_references = dir_data,
                     header_translations,
                     column_separators = c("\t", " ", "", ",", ";"),
@@ -7,7 +7,8 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
                     na.strings = c("NA", "nan", "NaN", "."), 
                     imputed_T = c("1", "TRUE", "T"), imputed_F = c("0", "FALSE", "F"), imputed_NA = c(NA, "-"),
 
-                    save_final_dataset = TRUE, order_columns = FALSE,
+                    save_final_dataset = TRUE, gzip_final_dataset = TRUE, order_columns = FALSE,
+                    spreadsheet_friendly_log = FALSE,
                     out_header = "standard", out_quote = FALSE, out_sep = "\t",
                     out_eol = "\n", out_na = "NA", out_dec = ".", out_qmethod = "escape",
                     out_rownames = FALSE, out_colnames = TRUE,
@@ -18,22 +19,24 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
                     
                     make_plots = TRUE, only_plot_if_threshold = TRUE,
                     threshold_allele_freq_correlation = 0.95, threshold_p_correlation = 0.99,
+                    plot_intensity = FALSE,
                     plot_histograms = make_plots,  plot_QQ = make_plots, plot_QQ_bands = TRUE,
                     plot_Manhattan = make_plots, plot_cutoff_p = 0.05,
                     
                     allele_ref_std, allele_name_std,
                     allele_ref_alt, allele_name_alt,
                     update_alt = FALSE, update_savename, update_as_rdata = FALSE, backup_alt = FALSE,
-                    remove_mismatches = FALSE,
+                    remove_mismatches = TRUE,
                     remove_mismatches_std = remove_mismatches, remove_mismatches_alt = remove_mismatches,
                     threshold_diffEAF = 0.15, remove_diffEAF = FALSE,
                     remove_diffEAF_std = remove_diffEAF, remove_diffEAF_alt = remove_diffEAF,
-                    check_ambiguous_alleles = TRUE, 
+                    check_ambiguous_alleles = FALSE, 
                     
                     use_threshold = 0.1,
                     useFRQ_threshold = use_threshold, useHWE_threshold = use_threshold, useCal_threshold = use_threshold, useImp_threshold = use_threshold, useMan_threshold = use_threshold,
-                    HQfilter_FRQ = NULL, HQfilter_HWE = NULL, HQfilter_cal = NULL, HQfilter_imp = NULL,
-                    QQfilter_FRQ = NULL, QQfilter_HWE = NULL, QQfilter_cal = NULL, QQfilter_imp = NULL,
+                    HQfilter_FRQ = 0.01, HQfilter_HWE = 10^-6, HQfilter_cal = 0.95, HQfilter_imp = 0.3,
+                    QQfilter_FRQ = c(NA, 0.01, 0.05), QQfilter_HWE = c(NA, 10^-6, 10^-4),
+                    QQfilter_cal = c(NA, 0.95, 0.99), QQfilter_imp = c(NA, 0.3, 0.5, 0.8),
                     NAfilter = TRUE, NAfilter_FRQ = NAfilter,
                     NAfilter_HWE = NAfilter, NAfilter_cal = NAfilter, NAfilter_imp = NAfilter,
                     ignore_impstatus = FALSE,
@@ -45,40 +48,44 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   #	are removed from "filename". If filename_output is invalid, "QC_[filename]"
   #	will be used instead.
   
+  start_time <- date()
+  
   stopifnot(is.character(filename), length(filename) == 1L, !is.na(filename),
             is.character(dir_data), length(dir_data) == 1L,
             is.character(dir_output), length(dir_output) == 1L,
             is.character(dir_references), length(dir_references) == 1L)
   if(nchar(filename) < 3L | nchar(dir_data) == 0L | nchar(dir_output) == 0L | nchar(dir_references) == 0L) {
     stop("File / directory names cannot be empty character-strings") } 
-  if(!file.exists(dir_data) | !file.exists(dir_references)) { stop("Cannot find specified directory(s)") }
-  if(!file.exists(paste(dir_data, filename, sep = "/"))) { stop("Cannot find the data file in input directory") }
+  if(!file.exists(dir_data) | !file.exists(dir_references)) stop("Cannot find specified directory(s)")
+  if(!file.exists(paste(dir_data, filename, sep = "/"))) stop("Cannot find the data file in input directory")
   
   if(length(header_translations) == 1L) {
     stopifnot(is.character(header_translations), nchar(header_translations) > 2L, file.exists(paste(dir_references, header_translations, sep = "/")))
     settings_header_input <- header_translations
     header_translations <- read.table(paste(dir_references, header_translations, sep = "/"), stringsAsFactors = FALSE)
   } else { settings_header_input <- "table" }
-  if(!is.data.frame(header_translations) & !is.matrix(header_translations)) { stop("'header_translations' is not a table, matrix or dataframe") }
-  if(ncol(header_translations) != 2L) { stop("'header_translations' does not have two columns") }
-  if(any(duplicated(header_translations[ ,2]))) { stop("'header_translations' contains duplicated elements in column 2") }
+  if(!is.data.frame(header_translations) & !is.matrix(header_translations)) stop("'header_translations' is not a table, matrix or dataframe")
+  if(ncol(header_translations) != 2L) stop("'header_translations' does not have two columns")
+  if(any(duplicated(header_translations[ ,2]))) stop("'header_translations' contains duplicated elements in column 2")
   
   stopifnot(is.logical(header), length(header) == 1L)
-  if(is.na(header))	{ stop("'header' cannot be NA") }
+  if(is.na(header))	stop("'header' cannot be NA")
   stopifnot(is.numeric(nrows), length(nrows) == 1L)
-  if(is.na(nrows) | nrows == 0) {	stop("'nrows' cannot be missing or zero") } 
+  if(is.na(nrows) | nrows == 0)	stop("'nrows' cannot be missing or zero")
   stopifnot(is.numeric(nrows_test), length(nrows_test) == 1L)
-  if(is.na(nrows_test) | nrows_test == 0) { stop("'nrows_test' cannot be missing or zero") } 
+  if(is.na(nrows_test) | nrows_test == 0) stop("'nrows_test' cannot be missing or zero") 
   stopifnot(is.character(comment.char), length(comment.char) == 1L)
-  if(nchar(comment.char) != 1L & nchar(comment.char) != 0L) { stop("'comment.char' must be a single character or empty string") }
+  if(nchar(comment.char) != 1L & nchar(comment.char) != 0L) stop("'comment.char' must be a single character or empty string")
   
   stopifnot(is.vector(na.strings), is.character(na.strings), is.vector(imputed_T), is.vector(imputed_F), is.vector(imputed_NA),
             is.vector(column_separators), is.character(column_separators), is.logical(ignore_impstatus), length(ignore_impstatus) == 1L, !is.na(ignore_impstatus))
-  if(any(duplicated(c(imputed_NA, imputed_T, imputed_F)))) { stop("duplicate strings in the 'imputed' arguments") }
+  if(any(duplicated(c(imputed_NA, imputed_T, imputed_F)))) stop("duplicate strings in the 'imputed' arguments")
   
-  stopifnot(is.logical(save_final_dataset), length(save_final_dataset) == 1L, is.logical(order_columns), length(order_columns) == 1L)
-  if(is.na(save_final_dataset)) { stop("'save_final_dataset' cannot be NA") }
-  if(is.na(order_columns)) { stop("'order_columns' cannot be NA") }
+  stopifnot(is.logical(save_final_dataset), length(save_final_dataset) == 1L, is.logical(order_columns), length(order_columns) == 1L,
+            is.logical(spreadsheet_friendly_log), length(spreadsheet_friendly_log) == 1L)
+  if(is.na(save_final_dataset)) stop("'save_final_dataset' cannot be NA")
+  if(is.na(order_columns)) stop("'order_columns' cannot be NA")
+  if(is.na(spreadsheet_friendly_log)) stop("'spreadsheet_friendly_log' cannot be NA")
   
   if(save_final_dataset) {
     stopifnot(is.logical(out_quote), length(out_quote) == 1L,
@@ -86,12 +93,14 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
               is.character(out_eol), length(out_eol) == 1L,
               is.character(out_na),	length(out_na) == 1L,
               is.character(out_dec), length(out_dec) == 1L,
-              is.character(out_qmethod), length(out_qmethod) == 1L)
-    if(is.na(out_quote)) { stop("'out_quote' cannot be NA") }
-    if(nchar(out_sep) == 0L) { stop("'out_sep' cannot be an empty character-string") }
-    if(nchar(out_eol) == 0L) { stop("'out_eol' cannot be an empty character-string") }
-    if(nchar(out_dec) != 1L) { stop("'out_dec' must be of length 1") }
-    if(!out_qmethod %in% c("escape", "double", "e", "d")) { stop("'out_qmethod' must be either 'escape' or 'double'") }
+              is.character(out_qmethod), length(out_qmethod) == 1L,
+              is.logical(gzip_final_dataset), length(gzip_final_dataset) == 1L)
+    if(is.na(out_quote)) stop("'out_quote' cannot be NA")
+    if(is.na(gzip_final_dataset)) stop("'gzip_final_dataset' cannot be NA")
+    if(nchar(out_sep) == 0L) stop("'out_sep' cannot be an empty character-string")
+    if(nchar(out_eol) == 0L) stop("'out_eol' cannot be an empty character-string")
+    if(nchar(out_dec) != 1L) stop("'out_dec' must be of length 1")
+    if(!out_qmethod %in% c("escape", "double", "e", "d")) stop("'out_qmethod' must be either 'escape' or 'double'")
     if(length(out_header) == 1L) {
       stopifnot(is.character(out_header), nchar(out_header) > 2L)
       settings_header_output <- out_header
@@ -105,7 +114,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
           } else {
             out_header <- data.frame(
               GWAMA = c("MARKER", "CHR", "POSITION", "EA", "NEA", "STRAND", "BETA", "SE", "P", "EAF", "N", "IMPUTED", "IMP_QUALITY"),
-              PLINK = c("SNP",  	"CHR", "BP",			 "A1", "A2",	"STRAND", "BETA", "SE", "P", "EFF_ALL_FREQ", "N", "IMPUTED", "IMP_QUALITY"),
+              PLINK = c("SNP",		"CHR", "BP",			 "A1", "A2",	"STRAND", "BETA", "SE", "P", "EFF_ALL_FREQ", "N", "IMPUTED", "IMP_QUALITY"),
               META = c( "rsid",	 "chr", "pos",			"allele_B", "allele_A", "strand", "beta", "se", "P_value", "EFF_ALL_FREQ", "N", "imputed", "info"),
               old =c("MARKER", "CHR", "POSITION", "ALLELE1",		"ALLELE2",	 "STRAND", "EFFECT", "STDERR", "PVALUE", "FREQLABEL",		"N_TOTAL", "IMPUTED", "IMP_QUALITY"),
               QC = c("MARKER", "CHR", "POSITION", "EFFECT_ALL", "OTHER_ALL", "STRAND", "EFFECT", "STDERR", "PVALUE", "EFF_ALL_FREQ", "N_TOTAL", "IMPUTED", "IMP_QUALITY"),
@@ -114,11 +123,11 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
           }
         }
       } else {
-        if(!file.exists(paste(dir_references, out_header, sep = "/"))) { stop("'out_header' is not a standard name nor a filename in dir_references") }
+        if(!file.exists(paste(dir_references, out_header, sep = "/"))) stop("'out_header' is not a standard name nor a filename in dir_references")
         out_header <- read.table(paste(dir_references, out_header, sep = "/"), stringsAsFactors = FALSE)
       }
     } else {
-      if(!is.matrix(out_header) & !is.data.frame(out_header)) { stop("'out_header' is not a table, filename or standard name") }
+      if(!is.matrix(out_header) & !is.data.frame(out_header)) stop("'out_header' is not a table, filename or standard name")
       settings_header_output <- "table"
     }
     if(is.matrix(out_header) | is.data.frame(out_header)) {
@@ -221,12 +230,14 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
             is.logical(remove_mismatches_alt), length(remove_mismatches_alt) == 1L,
             is.logical(remove_diffEAF_std), length(remove_diffEAF_std) == 1L,
             is.logical(remove_diffEAF_alt), length(remove_diffEAF_alt) == 1L,
-            is.numeric(threshold_diffEAF), length(threshold_diffEAF) == 1L)
+            is.numeric(threshold_diffEAF), length(threshold_diffEAF) == 1L,
+            is.logical(plot_intensity), length(plot_intensity) == 1L)
   if(is.na(check_ambiguous_alleles)) stop("'check_ambiguous_alleles' cannot be NA")
   if(is.na(remove_mismatches_std)) stop("'remove_mismatches_std' cannot be NA")
   if(is.na(remove_mismatches_alt)) stop("'remove_mismatches_alt' cannot be NA")
   if(is.na(remove_diffEAF_std)) stop("'remove_diffEAF_std' cannot be NA")
   if(is.na(remove_diffEAF_alt)) stop("'remove_diffEAF_alt' cannot be NA")
+  if(is.na(plot_intensity)) stop("'plot_intensity' cannot be NA")
   
   if(use_allele_std) {
     if(is.character(allele_ref_std)) {
@@ -238,8 +249,8 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
         if(missing(allele_name_std)) allele_name_std <- substr(allele_ref_std, 1L, nchar(allele_ref_std) - 6L)
         refs_name <- allele_ref_std
         refs_check<- load(paste(dir_references, allele_ref_std, sep = "/"))
-        if(!"allele_ref_std" %in% refs_check) stop(paste("no object with name 'allele_ref_std' inside", refs_name,
-                                                         ". The standard allele reference must have the object-name 'alele_ref_std', otherwise it cannot load."))
+        if(!"allele_ref_std" %in% refs_check) stop(paste0("no object with name 'allele_ref_std' inside ", refs_name,
+                                                          ". The standard allele reference must have the object-name 'alele_ref_std', otherwise it cannot load."))
         if(length(refs_check) > 1L) print(paste(" - - WARNING:", refs_name, "contains more than one object. This may affect the running of the QC."), quote = FALSE)
       } else {
         if(missing(allele_name_std)) allele_name_std <- remove_extension(allele_ref_std)
@@ -271,8 +282,8 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
         if(missing(allele_name_alt)) allele_name_alt <- substr(allele_ref_alt, 1L, nchar(allele_ref_alt) - 6L)
         refa_name <- allele_ref_alt
         refa_check<- load(paste(dir_references, allele_ref_alt, sep = "/"))
-        if(!"allele_ref_alt" %in% refa_check) stop(paste("no object with name 'allele_ref_alt' inside", refa_name,
-                                                         ". The alternative allele reference must have the object-name 'alele_ref_alt', otherwise it cannot load."))
+        if(!"allele_ref_alt" %in% refa_check) stop(paste0("no object with name 'allele_ref_alt' inside ", refa_name,
+                                                          ". The alternative allele reference must have the object-name 'alele_ref_alt', otherwise it cannot load."))
         if(length(refa_check) > 1L) print(paste(" - - WARNING:", refa_name, "contains more than one object. This may affect the running of the QC."), quote = FALSE)
       } else {
         if(missing(update_savename)) update_savename <- remove_extension(allele_ref_alt)
@@ -291,6 +302,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
     if(!is.character(allele_name_alt) | length(allele_name_alt) != 1L) stop("'allele_name_alt' is not a character-string")
     if(nchar(allele_name_alt) == 0L) stop("'allele_name_alt' cannot be an empty character-string")
   } else {
+    if(update_alt & missing(update_savename)) stop("Cannot update alternative reference: update_savename specified")
     settings_allele_alt <- NA
     allele_name_alt <- "alternative reference"
     remove_mismatches_alt <- FALSE
@@ -329,7 +341,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   
   print("", quote = FALSE)
   print("", quote = FALSE)
-  print(paste("Starting analysis of ", filename_input,"( file", logI, "out of", logN, ")"), quote = FALSE)
+  print(paste("Starting analysis of", filename_input,"( file", logI, "out of", logN, ")"), quote = FALSE)
   print(	"Step 1: loading dataset", quote = FALSE)
   flush.console()
   
@@ -375,11 +387,11 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   if(filename_error) { filename <- paste("QC", filename, sep = "_") }
   filename_dir <- paste(dir_output, filename, sep = "/")
   
-  write.table(t(c("Step", "Check", "Type", "Affected SNPs", "%", "Action", "Notes")), paste(filename_dir, "_log.txt", sep = ""), append=FALSE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+  write.table(t(c("Step", "Check", "Type", "Affected SNPs", "%", "Action", "Notes")), paste0(filename_dir, "_log.txt"), append=FALSE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
   
   if(filename_error) {
     save_log(1L, "loading dataset", "output filename", 0L, 1L, "-", "Cannot use specified output filename - reverted to default", filename_dir)
-    print(paste(" - - warning: unable to use specified output filename - reverted to default: ", filename, ".txt", sep = ""), quote = FALSE)
+    print(paste0(" - - warning: unable to use specified output filename - reverted to default: ", filename, ".txt"), quote = FALSE)
   }
   if(EmergencyExit) { # 1st phase-1 EmergencyExit: failure to load file
     print("CRITICAL ERROR: unable to load dataset ", quote=FALSE)
@@ -481,12 +493,12 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   } else {
     if(!is.character(dataI$EFFECT_ALL)) {
       print("CRITICAL ERROR: effect-allele column contains non-character entries",quote=FALSE)
-      save_log(2L, "allele data", "effect allele", SNPn_input - iNA_al1_L0, SNPn_input, "QC aborted", paste("Effect allele is ", mode(dataI$EFFECT_ALL), sep = ""), filename_dir)
+      save_log(2L, "allele data", "effect allele", SNPn_input - iNA_al1_L0, SNPn_input, "QC aborted", paste("Effect allele is", mode(dataI$EFFECT_ALL)), filename_dir)
       EmergencyExit <- TRUE
     }
     if(!is.character(dataI$OTHER_ALL)) {
       print("CRITICAL ERROR: non-effect-allele column contains non-character entries",quote=FALSE)
-      save_log(2L, "allele data", "non-effect allele", SNPn_input - iNA_al2_N, SNPn_input, "QC aborted", paste("Non-effect allele is ", mode(dataI$OTHER_ALL), sep = ""), filename_dir)
+      save_log(2L, "allele data", "non-effect allele", SNPn_input - iNA_al2_N, SNPn_input, "QC aborted", paste("Non-effect allele is", mode(dataI$OTHER_ALL)), filename_dir)
       EmergencyExit <- TRUE
     }
   }
@@ -595,9 +607,9 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   flush.console()
   
   SNPn_preQC		<- nrow(dataI)
-  reason_excl		<- vector(mode = "character",length = SNPn_preQC)
-  column_improb	<- vector(mode = "character",length = SNPn_preQC)
-  remove_L1_list	<- vector(mode = "logical",  length = SNPn_preQC)
+  reason_excl		<- character(length = SNPn_preQC)
+  column_improb	<- character(length = SNPn_preQC)
+  remove_L1_list	<- logical(length = SNPn_preQC)
   
   inv <- data.frame(
     chr = remove_L1_list, pos = remove_L1_list,
@@ -625,13 +637,13 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
     save_log(2L, "data integrity", "no imputation status", iNA_impstatus_N, SNPn_preQC, "-", "Imputation-status column contains no values!", filename_dir)
     print(" - - warning: no imputation-status data", quote=FALSE)
     inv$impstatus <- TRUE
-    column_improb <- paste(column_improb, "imputation status; ", sep = "")
+    column_improb <- paste0(column_improb, "imputation status; ")
     inv_impstatus_N <- 0L
   } else {
     new_impstatus <- convert_impstatus(dataI$IMPUTED, T_strings = imputed_T, F_strings = imputed_F, NA_strings = imputed_NA,
                                        use_log = TRUE, allSNPs = SNPn_preQC, fileL = filename_dir)
     inv$impstatus <- is.na(new_impstatus)
-    column_improb[inv$impstatus] <- paste(column_improb[inv$impstatus], "imputation status; ", sep = "")
+    column_improb[inv$impstatus] <- paste0(column_improb[inv$impstatus], "imputation status; ")
     inv_impstatus_N <- sum(inv$impstatus) - iNA_impstatus_N
     if(iNA_impstatus_N > 0L) {
       save_log(2L, "data integrity", "imputation status", iNA_impstatus_N, SNPn_preQC, "-", "Missing imputation status values", filename_dir)
@@ -663,7 +675,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   if(!is.numeric(dataI$IMP_QUALITY) & iNA_impQ_N != SNPn_preQC) {
     EmergencyExit <- TRUE
     print("CRITICAL ERROR: imputation-quality column contains non-numeric entries",quote=FALSE)
-    save_log(2L, "data integrity", "imputation quality", SNPn_preQC - iNA_impQ_N, SNPn_preQC, "QC aborted",	paste("Imputation quality is ", mode(dataI$IMP_QUALITY), sep = ""), filename_dir)
+    save_log(2L, "data integrity", "imputation quality", SNPn_preQC - iNA_impQ_N, SNPn_preQC, "QC aborted",	paste0("Imputation quality is ", mode(dataI$IMP_QUALITY)), filename_dir)
     low_impQ_list <- remove_L1_list
   } else {
     if(any(dataI$IMP_QUALITY == -1, na.rm = iNA_impQ_N > 0L)) {
@@ -675,9 +687,9 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
     iNA_impQ_i	<- sum(iNA$impQ &	imp_list)
     
     inv$impQ	<- !( (dataI$IMP_QUALITY >= minimal_impQ_value & dataI$IMP_QUALITY <= maximal_impQ_value) | iNA$impQ )
-    column_improb[inv$impQ] <- paste(column_improb[inv$impQ],"imputation quality; ",sep="")
-    inv_impQ_N	<- sum(inv$impQ)
+    inv_impQ_N  <- sum(inv$impQ)
     if(inv_impQ_N > 0L) { 
+      column_improb[inv$impQ] <- paste0(column_improb[inv$impQ],"imputation quality; ")
       inv_impQ_g <- sum(inv$impQ & geno_list)
       inv_impQ_i <- sum(inv$impQ &	imp_list)
       save_log(2, "data integrity", "imputation quality", inv_impQ_N, SNPn_preQC, "set to NA", "Invalid imputation quality", filename_dir)
@@ -700,7 +712,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   if(!is.character(dataI$MARKER) & iNA_mar_N != SNPn_preQC) {
     EmergencyExit <- TRUE
     print("CRITICAL ERROR: marker-name column contains non-character entries",quote=FALSE)
-    save_log(2L, "data integrity", "SNP names", SNPn_preQC, SNPn_preQC, "QC aborted", paste("Marker name is ", mode(dataI$MARKER), sep = ""), filename_dir)
+    save_log(2L, "data integrity", "SNP names", SNPn_preQC, SNPn_preQC, "QC aborted", paste0("Marker name is ", mode(dataI$MARKER)), filename_dir)
   } else {
     dupli_list <- duplicated(dataI$MARKER)
     if(iNA_mar_N > 0L) {
@@ -725,7 +737,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   iNA_chr_N <- sum(iNA$chr)
   if(iNA_chr_N != SNPn_preQC) {
     inv$chr	<- !(dataI$CHR %in% 1:26 | iNA$chr)
-    column_improb[inv$chr] <- paste(column_improb[inv$chr],"chromosome; ",sep="")
+    column_improb[inv$chr] <- paste0(column_improb[inv$chr],"chromosome; ")
     inv_chr_N	<- sum(inv$chr)
     if(inv_chr_N > 0L) { 
       save_log(2L, "data integrity", "chromosome number", inv_chr_N, SNPn_preQC, "set to NA", "Invalid chromosome number", filename_dir)
@@ -734,7 +746,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
     if(iNA_chr_N + inv_chr_N < SNPn_preQC) {
       if(any(!(c(1:22) %in% dataI$CHR))) {
         nochr <- paste(which(!(c(1:22) %in% dataI$CHR)), collapse=", ")
-        print(paste("No SNPs present for chromosome(s)", nochr), quote = FALSE)
+        print(paste(" - - no SNPs present for chromosome(s)", nochr), quote = FALSE)
         save_log(2L, "data integrity", "chromosome number", SNPn_preQC, SNPn_preQC, "-", paste("No SNPs present for chromosome(s)", nochr), filename_dir) 
     } }
   } else { inv_chr_N	<- 0L }
@@ -744,10 +756,10 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   if(!is.numeric(dataI$POSITION) & iNA_pos_N != SNPn_preQC) {
     EmergencyExit <- TRUE
     print("CRITICAL ERROR: position column contains non-integer entries",quote=FALSE)
-    save_log(2L, "data integrity", "position", SNPn_preQC, SNPn_preQC, "QC aborted", paste("Position is ", mode(dataI$POSITION), sep = ""), filename_dir)
+    save_log(2L, "data integrity", "position", SNPn_preQC, SNPn_preQC, "QC aborted", paste0("Position is ", mode(dataI$POSITION)), filename_dir)
   } else {
     inv$pos	 <- dataI$POSITION <= 0 & !iNA$pos
-    column_improb[inv$pos] <- paste(column_improb[inv$pos],"position; ",sep="")
+    column_improb[inv$pos] <- paste0(column_improb[inv$pos],"position; ")
     inv_pos_N <- sum(inv$pos)
     if(inv_pos_N > 0L) {
       save_log(2L, "data integrity", "position", inv_pos_N, SNPn_preQC, "set to NA", "Invalid positions", filename_dir)
@@ -761,7 +773,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   if(!is.character(dataI$EFFECT_ALL) & iNA_al1_N != SNPn_preQC) {
     EmergencyExit <- TRUE
     print("CRITICAL ERROR: effect-allele column contains non-character entries",quote=FALSE)
-    save_log(2L, "data integrity", "effect allele", SNPn_preQC, SNPn_preQC, "QC aborted", paste("Effect allele is ", mode(dataI$EFFECT_ALL), sep = ""), filename_dir)
+    save_log(2L, "data integrity", "effect allele", SNPn_preQC, SNPn_preQC, "QC aborted", paste0("Effect allele is ", mode(dataI$EFFECT_ALL)), filename_dir)
   } else {
     bad_al1	<- which(!dataI[ ,"EFFECT_ALL"] %in% c("A", "T", "C", "G"))
     reason_excl[bad_al1] <- paste(reason_excl[bad_al1],"Invalid effect allele;")
@@ -775,15 +787,15 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
       print(paste(" - - warning:", inv_al1_N, "invalid effect alleles"), quote = FALSE)      
     }
     
-    if(!"A" %in% dataI$EFFECT_ALL) save_log(2L, "data integrity", "effect allele", SNPn_preQC, SNPn_preQC, "-", "No 'A' alleles found in effect allele column", filename_dir)
-    if(!"C" %in% dataI$EFFECT_ALL) save_log(2L, "data integrity", "effect allele", SNPn_preQC, SNPn_preQC, "-", "No 'C' alleles found in effect allele column", filename_dir)
-    if(!"T" %in% dataI$EFFECT_ALL) save_log(2L, "data integrity", "effect allele", SNPn_preQC, SNPn_preQC, "-", "No 'T' alleles found in effect allele column", filename_dir)
-    if(!"G" %in% dataI$EFFECT_ALL) save_log(2L, "data integrity", "effect allele", SNPn_preQC, SNPn_preQC, "-", "No 'G' alleles found in effect allele column", filename_dir)
+    if(!"A" %in% dataI$EFFECT_ALL) save_log(2L, "data integrity", "effect allele", SNPn_preQC, SNPn_preQC, "-", "No A alleles found in effect allele column", filename_dir)
+    if(!"C" %in% dataI$EFFECT_ALL) save_log(2L, "data integrity", "effect allele", SNPn_preQC, SNPn_preQC, "-", "No C alleles found in effect allele column", filename_dir)
+    if(!"T" %in% dataI$EFFECT_ALL) save_log(2L, "data integrity", "effect allele", SNPn_preQC, SNPn_preQC, "-", "No T alleles found in effect allele column", filename_dir)
+    if(!"G" %in% dataI$EFFECT_ALL) save_log(2L, "data integrity", "effect allele", SNPn_preQC, SNPn_preQC, "-", "No G alleles found in effect allele column", filename_dir)
     
-    if(!"A" %in% dataI$OTHER_ALL ) save_log(2L, "data integrity", "other allele", SNPn_preQC, SNPn_preQC, "-", "No 'A' alleles found in non-effect allele column", filename_dir)
-    if(!"C" %in% dataI$OTHER_ALL ) save_log(2L, "data integrity", "other allele", SNPn_preQC, SNPn_preQC, "-", "No 'C' alleles found in non-effect allele column", filename_dir)
-    if(!"T" %in% dataI$OTHER_ALL ) save_log(2L, "data integrity", "other allele", SNPn_preQC, SNPn_preQC, "-", "No 'T' alleles found in non-effect allele column", filename_dir)
-    if(!"G" %in% dataI$OTHER_ALL ) save_log(2L, "data integrity", "other allele", SNPn_preQC, SNPn_preQC, "-", "No 'G' alleles found in non-effect allele column", filename_dir)
+    if(!"A" %in% dataI$OTHER_ALL ) save_log(2L, "data integrity",  "other allele", SNPn_preQC, SNPn_preQC, "-", "No A alleles found in non-effect allele column", filename_dir)
+    if(!"C" %in% dataI$OTHER_ALL ) save_log(2L, "data integrity",  "other allele", SNPn_preQC, SNPn_preQC, "-", "No C alleles found in non-effect allele column", filename_dir)
+    if(!"T" %in% dataI$OTHER_ALL ) save_log(2L, "data integrity",  "other allele", SNPn_preQC, SNPn_preQC, "-", "No T alleles found in non-effect allele column", filename_dir)
+    if(!"G" %in% dataI$OTHER_ALL ) save_log(2L, "data integrity",  "other allele", SNPn_preQC, SNPn_preQC, "-", "No G alleles found in non-effect allele column", filename_dir)
   }
   
   # Testing strand_info
@@ -792,11 +804,11 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
     if(strand_pre$missing > 0L) {
       strand_min <- dataI$STRAND == "-" & !iNA$strand
       inv$strand <- !(dataI$STRAND == "+" | strand_min | iNA$strand )
-      column_improb[inv$strand] <- paste(column_improb[inv$strand],"strand; ",sep="")
+      column_improb[inv$strand] <- paste0(column_improb[inv$strand],"strand; ")
     } else {
       strand_min <- dataI$STRAND == "-"
       inv$strand <- !(dataI$STRAND == "+" | strand_min)
-      column_improb[inv$strand] <- paste(column_improb[inv$strand],"strand; ",sep="")
+      column_improb[inv$strand] <- paste0(column_improb[inv$strand],"strand; ")
     }
     strand_pre$minus <- sum(strand_min)
     strand_pre$invalid <- sum(inv$strand)
@@ -814,7 +826,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
     } else {
       strand_pre$invalid <- SNPn_preQC - strand_pre$missing
       print("CRITICAL ERROR: strand column contains non-character entries", quote=FALSE)
-      save_log(2L, "data integrity", "strand", strand_pre$invalid, SNPn_preQC, "QC aborted", paste("Strand information is ", mode(dataI$STRAND), sep = ""), filename_dir)
+      save_log(2L, "data integrity", "strand", strand_pre$invalid, SNPn_preQC, "QC aborted", paste0("Strand information is ", mode(dataI$STRAND)), filename_dir)
       EmergencyExit <- TRUE
   } }
   
@@ -825,7 +837,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   if(!is.numeric(dataI$EFFECT) & iNA_eff_N != SNPn_preQC) {
     EmergencyExit <- TRUE
     print("CRITICAL ERROR: effect size column contains non-numeric entries",quote=FALSE)
-    save_log(2L, "data integrity", "effect size", SNPn_preQC, SNPn_preQC, "QC aborted", paste("Effect size is ", mode(dataI$EFFECT), sep = ""), filename_dir)
+    save_log(2L, "data integrity", "effect size", SNPn_preQC, SNPn_preQC, "QC aborted", paste0("Effect size is ", mode(dataI$EFFECT)), filename_dir)
   } else {
     min_eff <- which(dataI$EFFECT == -1 & (dataI$PVALUE == -1 | dataI$STDERR == -1))
     if(length(min_eff) > 0L) {
@@ -849,7 +861,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   if(!is.numeric(dataI$STDERR) & iNA_se_N != SNPn_preQC) {
     EmergencyExit <- TRUE
     print("CRITICAL ERROR: SE column contains non-numeric entries",quote=FALSE)
-    save_log(2L, "data integrity", "standard error", SNPn_preQC, SNPn_preQC, "QC aborted", paste("Standard error is ", mode(dataI$STDERR), sep = ""), filename_dir)
+    save_log(2L, "data integrity", "standard error", SNPn_preQC, SNPn_preQC, "QC aborted", paste0("Standard error is ", mode(dataI$STDERR)), filename_dir)
   } else {
     if(any(dataI$STDERR == -1, na.rm = iNA_se_N > 0L)) {
       iNA_se						<- c(iNA_se, which(dataI$STDERR == -1))
@@ -884,7 +896,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   if(!is.numeric(dataI$PVALUE) & iNA_p_N != SNPn_preQC) {
     EmergencyExit <- TRUE
     print("CRITICAL ERROR: p-value column contains non-numeric entries",quote=FALSE)
-    save_log(2L, "data integrity", "p-value", SNPn_preQC, SNPn_preQC, "QC aborted", paste("P-value is ", mode(dataI$PVALUE), sep = ""), filename_dir)
+    save_log(2L, "data integrity", "p-value", SNPn_preQC, SNPn_preQC, "QC aborted", paste0("P-value is ", mode(dataI$PVALUE)), filename_dir)
   } else {
     if(any(dataI$PVALUE == -1, na.rm = iNA_p_N > 0L)) {
       iNA$p[which(dataI$PVALUE == -1)]	<- TRUE
@@ -892,7 +904,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
       dataI$PVALUE[which(dataI$PVALUE == -1)]	<- NA
     }
     inv$p		<- !( (dataI$PVALUE > 0 & dataI$PVALUE <= 1) | iNA$p )
-    column_improb[inv$p] <- paste(column_improb[inv$p],"p-value; ",sep="")
+    column_improb[inv$p] <- paste0(column_improb[inv$p],"p-value; ")
     inv_p_N	<- sum(inv$p)
     if(inv_p_N > 0L) {
       save_log(2L, "data integrity", "p-value", inv_p_N, SNPn_preQC, "set to NA", "Invalid p-value", filename_dir)
@@ -904,7 +916,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   if(!is.numeric(dataI$EFF_ALL_FREQ) & iNA_FRQ_N != SNPn_preQC) {
     EmergencyExit <- TRUE
     print("CRITICAL ERROR: allele-frequency column contains non-numeric entries",quote=FALSE)
-    save_log(2L, "data integrity", "allele frequency", SNPn_preQC, SNPn_preQC, "QC aborted", paste("Allele frequency is ", mode(dataI$EFF_ALL_FREQ), sep = ""), filename_dir)
+    save_log(2L, "data integrity", "allele frequency", SNPn_preQC, SNPn_preQC, "QC aborted", paste0("Allele frequency is ", mode(dataI$EFF_ALL_FREQ)), filename_dir)
   } else {
     if(any(dataI$EFF_ALL_FREQ == -1, na.rm = iNA_FRQ_N > 0L)) {
       iNA$FRQ[which(dataI$EFF_ALL_FREQ == -1)] 	<- TRUE
@@ -912,7 +924,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
       dataI$EFF_ALL_FREQ[which(dataI$EFF_ALL_FREQ == -1)]	<- NA
     }
     inv$FRQ	<- !( (dataI$EFF_ALL_FREQ >= 0 & dataI$EFF_ALL_FREQ <= 1) | iNA$FRQ )
-    column_improb[inv$FRQ] <- paste(column_improb[inv$FRQ],"allele frequency; ",sep="")
+    column_improb[inv$FRQ] <- paste0(column_improb[inv$FRQ],"allele frequency; ")
     inv_FRQ_N	<- sum(inv$FRQ)
     if(inv_FRQ_N > 0L) {
       save_log(2L, "data integrity", "allele frequency", inv_FRQ_N, SNPn_preQC, "set to NA", "Invalid allele frequencies", filename_dir)
@@ -924,7 +936,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   if(!is.numeric(dataI$HWE_PVAL) & iNA_HWE_N != SNPn_preQC) {
     EmergencyExit <- TRUE
     print("CRITICAL ERROR: HWE p-value column contains non-numeric entries",quote=FALSE)
-    save_log(2L, "data integrity", "HWE p-value", SNPn_preQC, SNPn_preQC, "QC aborted", paste("HWE p-value is ", mode(dataI$HWE_PVAL), sep = ""), filename_dir)
+    save_log(2L, "data integrity", "HWE p-value", SNPn_preQC, SNPn_preQC, "QC aborted", paste0("HWE p-value is ", mode(dataI$HWE_PVAL)), filename_dir)
   } else {
     if(any(dataI$HWE_PVAL == -1, na.rm = iNA_HWE_N > 0L)) {
       iNA$HWE[which(dataI$HWE_PVAL == -1)]		<- TRUE
@@ -932,7 +944,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
       dataI$HWE_PVAL[which(dataI$HWE_PVAL == -1)]	<- NA
     }
     inv$HWE <- !( (dataI$HWE_PVAL > 0 & dataI$HWE_PVAL <= 1) | iNA$HWE )
-    column_improb[inv$HWE] <- paste(column_improb[inv$HWE],"HWE p-value; ",sep="")
+    column_improb[inv$HWE] <- paste0(column_improb[inv$HWE],"HWE p-value; ")
     inv_HWE_N <- sum(inv$HWE)
     
     iNA_HWE_g <- sum(iNA$HWE & geno_list)
@@ -952,7 +964,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   if(!is.numeric(dataI$CALLRATE) & iNA_cal_N != SNPn_preQC) {
     EmergencyExit <- TRUE
     print("CRITICAL ERROR: call-rate column contains non-numeric entries",quote=FALSE)
-    save_log(2L, "data integrity", "call rate", SNPn_preQC, SNPn_preQC, "QC aborted", paste("Call rate is ", mode(dataI$CALLRATE), sep = ""), filename_dir)
+    save_log(2L, "data integrity", "call rate", SNPn_preQC, SNPn_preQC, "QC aborted", paste0("Call rate is ", mode(dataI$CALLRATE)), filename_dir)
   } else {
     if(any(dataI$CALLRATE == -1, na.rm = iNA_cal_N > 0L)) {
       iNA$cal[which(dataI$CALLRATE == -1)]		<- TRUE
@@ -960,7 +972,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
       dataI$CALLRATE[which(dataI$CALLRATE == -1)]	<- NA
     }
     inv$cal	<- !( (dataI$CALLRATE >= 0 & dataI$CALLRATE <= 1) | iNA$cal )
-    column_improb[inv$cal] <- paste(column_improb[inv$cal],"call rate; ",sep="")
+    column_improb[inv$cal] <- paste0(column_improb[inv$cal],"call rate; ")
     inv_cal_N	<- sum(inv$cal)
     
     iNA_cal_g	<- sum(iNA$cal & geno_list)
@@ -980,12 +992,12 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   if(!is.numeric(dataI$N_TOTAL) & iNA_N_N != SNPn_preQC) {
     EmergencyExit <- TRUE
     print("CRITICAL ERROR: QC aborted because sample-size column contains non-numeric entries",quote=FALSE)
-    save_log(2L, "data integrity", "sample size", SNPn_preQC, SNPn_preQC, "QC aborted", paste("Sample size is ", mode(dataI$N_TOTAL), sep = ""), filename_dir)
+    save_log(2L, "data integrity", "sample size", SNPn_preQC, SNPn_preQC, "QC aborted", paste0("Sample size is ", mode(dataI$N_TOTAL)), filename_dir)
   } else {
     iNA_N_g <- sum( iNA$N & geno_list)
     iNA_N_i <- sum( iNA$N & imp_list)
     inv$N	  <- dataI$N_TOTAL <= 0 & !iNA$N
-    column_improb[inv$N] <- paste(column_improb[inv$N],"sample size; ",sep="")
+    column_improb[inv$N] <- paste0(column_improb[inv$N],"sample size; ")
     inv_N_N <- sum(inv$N)
     if(inv_N_N > 0L) {
       save_log(2L, "data integrity", "sample size", inv_N_N, SNPn_preQC, "set to NA", "Invalid sample size", filename_dir)
@@ -1132,24 +1144,26 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
     ref_std <- dataI$MARKER %in% allele_ref_std$SNP
     SNPn_ref_std <- sum(ref_std)
     if(SNPn_ref_std > 0L) {
-      print(paste(" - matching alleles to", allele_name_std), quote = FALSE)			
+      print(paste(" - matching alleles to", allele_name_std), quote = FALSE)    	
       flush.console()
-      allele_out_std <- match_alleles(dataset = dataI[ref_std, c("MARKER", "EFFECT_ALL", "OTHER_ALL", "STRAND", "EFFECT", "EFF_ALL_FREQ")[c(TRUE, TRUE, TRUE, strand_ref$minus > 0L, TRUE, TRUE)]],
+      allele_out_std <- match_alleles(dataset = dataI[ref_std,
+                                                      c("MARKER", "EFFECT_ALL", "OTHER_ALL", "STRAND", "EFFECT", "EFF_ALL_FREQ")[c(TRUE, TRUE, TRUE, strand_ref$minus > 0L, TRUE, TRUE)]],
                                       dataname = filename,
-                                      ref_set = allele_ref_std[ , c("SNP", "MINOR", "MAJOR", "MAF")],
-                                      ref_name = allele_name_std, 
+                                      ref_set = allele_ref_std, ref_name = allele_name_std,
                                       unmatched_data = FALSE, HQ_subset = FRQ_HQ_list[ref_std],
                                       check_strand = strand_ref$minus > 0L,
                                       save_mismatches = TRUE, delete_mismatches = remove_mismatches_std,
                                       delete_diffEAF = remove_diffEAF_std, threshold_diffEAF = threshold_diffEAF,
                                       check_FRQ = TRUE, check_ambiguous = check_ambiguous_alleles,
-                                      plot_FRQ = make_plots, plot_if_threshold = only_plot_if_threshold, threshold_r = threshold_allele_freq_correlation,
-                                      return_SNPs = TRUE, return_ref_values = FALSE,
+                                      plot_FRQ = make_plots, plot_intensity = plot_intensity,
+                                      plot_if_threshold = only_plot_if_threshold, threshold_r = threshold_allele_freq_correlation,
+                                      return_SNPs = TRUE,
                                       save_name = filename, save_dir = dir_output, use_log = TRUE, log_SNPall = SNPn_ref )
       
       dataI$EFFECT_ALL[ref_std] <- allele_out_std$EFFECT_ALL
       dataI$OTHER_ALL[ref_std] <- allele_out_std$OTHER_ALL
-      if(strand_ref$minus > 0L) { dataI$STRAND[ref_std] <- allele_out_std$STRAND }
+      if(strand_ref$minus > 0L & allele_out_std$n_negative_strand > 0L) {
+        dataI$STRAND[ref_std] <- allele_out_std$STRAND }
       dataI$EFFECT[ref_std] <- allele_out_std$EFFECT
       dataI$EFF_ALL_FREQ[ref_std] <- allele_out_std$EFF_ALL_FREQ
       
@@ -1172,8 +1186,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   
   # Step 3b: using alternative reference
   if(use_allele_alt) {
-    if(use_allele_std) { 	ref_alt <- (dataI$MARKER %in% allele_ref_alt$SNP) & !ref_std
-    } else {			ref_alt <- (dataI$MARKER %in% allele_ref_alt$SNP) }
+    ref_alt <- if(use_allele_std) !ref_std & dataI$MARKER %in% allele_ref_alt$SNP else dataI$MARKER %in% allele_ref_alt$SNP
     SNPn_ref_alt<- sum(ref_alt)
     
     if(SNPn_ref_alt > 0L) {
@@ -1181,20 +1194,20 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
       flush.console()
       allele_out_alt <- match_alleles(dataset = dataI[ref_alt, c("MARKER", "EFFECT_ALL", "OTHER_ALL", "STRAND", "EFFECT", "EFF_ALL_FREQ")[c(TRUE, TRUE, TRUE, strand_ref$minus > 0L, TRUE, TRUE)]],
                                       dataname = filename,
-                                      ref_set = allele_ref_alt[ , c("SNP", "MINOR", "MAJOR", "MAF")],
-                                      ref_name = allele_name_alt,
+                                      ref_set = allele_ref_alt, ref_name = allele_name_alt,
                                       unmatched_data = FALSE, HQ_subset = FRQ_HQ_list[ref_alt],
                                       check_strand = strand_ref$minus > 0L,
                                       save_mismatches = TRUE, delete_mismatches = remove_mismatches_alt,
                                       delete_diffEAF = remove_diffEAF_alt, threshold_diffEAF = threshold_diffEAF,
                                       check_FRQ = TRUE, check_ambiguous = check_ambiguous_alleles,
-                                      plot_FRQ = make_plots, plot_if_threshold = only_plot_if_threshold, threshold_r = threshold_allele_freq_correlation,
-                                      return_SNPs = TRUE, return_ref_values = FALSE,
+                                      plot_FRQ = make_plots, plot_intensity = plot_intensity,
+                                      plot_if_threshold = only_plot_if_threshold, threshold_r = threshold_allele_freq_correlation,
+                                      return_SNPs = TRUE,
                                       save_name = filename, save_dir = dir_output, use_log = TRUE, log_SNPall = SNPn_ref )
       
       dataI$EFFECT_ALL[ref_alt] <- allele_out_alt$EFFECT_ALL
       dataI$OTHER_ALL[ref_alt] <- allele_out_alt$OTHER_ALL
-      if(strand_ref$minus > 0L) { dataI$STRAND[ref_alt] <- allele_out_alt$STRAND }
+      if(strand_ref$minus > 0L & allele_out_alt$n_negative_strand > 0L) { dataI$STRAND[ref_alt] <- allele_out_alt$STRAND }
       dataI$EFFECT[ref_alt] <- allele_out_alt$EFFECT
       dataI$EFF_ALL_FREQ[ref_alt]<- allele_out_alt$EFF_ALL_FREQ
       
@@ -1213,7 +1226,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
                            n_SNPs = NA, n_negative_strand = NA, n_negative_switch = NA, n_negative_mismatch = NA,
                            n_strandswitch = NA, n_mismatch = NA, n_flipped = NA, n_ambiguous = NA, n_suspect = NA, n_diffEAF = NA)
   }
-  
+
   # Step 3c: adding unknown SNPs to alternative reference
   SNPn_ref_new <- SNPn_ref - SNPn_ref_std - SNPn_ref_alt
   if(SNPn_ref_new > 0L) {
@@ -1237,7 +1250,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
         if(SNPn_ref_std > 0L) {	ref_new <- !ref_std
         } else {			ref_new <- !ref_alt }
       }
-    } else {					ref_new <- !vector(mode = "logical", length = SNPn_ref) }
+    } else {					ref_new <- !logical(length = SNPn_ref) }
     
     allele_out_new <- list(n_SNPs = SNPn_ref_new,
                            n_negative_strand = if(strand_ref$minus == 0L) { 0L } else { sum(strand_min[ref_new]) },
@@ -1260,12 +1273,12 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
     
     if(update_alt) {
       if(update_as_rdata) {
-        update_savename <- paste(update_savename, ".RData", sep = "")
+        update_savename <- paste0(update_savename, ".RData")
         if(backup_alt & file.exists(paste(dir_references, update_savename, sep = "/"))) {
-          save_log(3L, "allele match ", "back-up", 0L, 1L, "saved back-up", paste("Back-up of previous alternative reference file saved as: ", dir_references, "/", remove_extension(update_savename), "_", Sys.Date(), ".RData", sep=""), filename_dir)
+          save_log(3L, "allele match ", "back-up", 0L, 1L, "saved back-up", paste0("Back-up of previous alternative reference file saved as: ", dir_references, "/", remove_extension(update_savename), "_", Sys.Date(), ".RData"), filename_dir)
           print(" - - creating back-up of previous alternative-reference file", quote = FALSE)
           flush.console()
-          file.rename(paste(dir_references, update_savename, sep = "/"), paste(dir_references, "/", remove_extension(update_savename), "_", Sys.Date(), ".RData", sep=""))
+          file.rename(paste(dir_references, update_savename, sep = "/"), paste0(dir_references, "/", remove_extension(update_savename), "_", Sys.Date(), ".RData"))
         }
         print(" - - saving alternative-reference file", quote = FALSE)
         flush.console()
@@ -1289,12 +1302,12 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
         # necessary.
         
       } else {
-        update_savename <- paste(update_savename, ".txt", sep = "")
+        update_savename <- paste0(update_savename, ".txt")
         if(backup_alt & file.exists(paste(dir_references, update_savename, sep = "/"))) {
-          save_log(3L, "allele match ", "back-up", 1L, 1L, "created back-up", paste("copy of previous alternative reference file saved as: ", dir_references, "/", remove_extension(update_savename), "_", Sys.Date(), ".RData", sep=""), filename_dir)
+          save_log(3L, "allele match ", "back-up", 1L, 1L, "created back-up", paste0("copy of previous alternative reference file saved as: ", dir_references, "/", remove_extension(update_savename), "_", Sys.Date(), ".RData"), filename_dir)
           print(" - - creating back-up of previous alternative-reference file", quote = FALSE)
           flush.console()
-          file.copy(paste(dir_references, update_savename, sep = "/"), paste(dir_references, "/", remove_extension(update_savename), "_", Sys.Date(), ".txt", sep=""))
+          file.copy(paste(dir_references, update_savename, sep = "/"), paste0(dir_references, "/", remove_extension(update_savename), "_", Sys.Date(), ".txt"))
         }
         print(" - - saving alternative-reference file", quote = FALSE)
         flush.console()
@@ -1324,19 +1337,19 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
     
     use_L2 <- FALSE
     if(SNPn_ref_std > 0L & allele_out_std$n_mismatch > 0L) {
-      print(paste(" - - mismatches with ", allele_name_std, ": ", allele_out_std$n_mismatch, sep = ""), quote = FALSE)
+      print(paste0(" - - mismatches with ", allele_name_std, ": ", allele_out_std$n_mismatch), quote = FALSE)
       if(remove_mismatches_std) use_L2 <- TRUE
     }
     if(SNPn_ref_alt > 0L & allele_out_alt$n_mismatch > 0L) {
-      print(paste(" - - mismatches with ", allele_name_alt, ": ", allele_out_alt$n_mismatch, sep = ""), quote = FALSE)
+      print(paste0(" - - mismatches with ", allele_name_alt, ": ", allele_out_alt$n_mismatch), quote = FALSE)
       if(remove_mismatches_alt) use_L2 <- TRUE
     }
     if(SNPn_ref_std > 0L & allele_out_std$n_diffEAF > 0L) {
-      print(paste(" - - differing allele frequencies from ", allele_name_std, ": ", allele_out_std$n_diffEAF, sep = ""), quote = FALSE)
+      print(paste0(" - - differing allele frequencies from ", allele_name_std, ": ", allele_out_std$n_diffEAF), quote = FALSE)
       if(remove_diffEAF_std) use_L2 <- TRUE
     }
     if(SNPn_ref_alt > 0L & allele_out_alt$n_diffEAF > 0L) {
-      print(paste(" - - differing allele frequencies from ", allele_name_alt, ": ", allele_out_alt$n_diffEAF, sep = ""), quote = FALSE)
+      print(paste0(" - - differing allele frequencies from ", allele_name_alt, ": ", allele_out_alt$n_diffEAF), quote = FALSE)
       if(remove_diffEAF_alt) use_L2 <- TRUE
     }
     flush.console()
@@ -1463,7 +1476,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
     print(" - creating histograms", quote = FALSE)
     flush.console()
     
-    jpeg(paste(filename_dir, "graph_histogram.jpg", sep = "_"),	width = 1440, height = 960, res = 108)
+    png(paste(filename_dir, "graph_histogram.png", sep = "_"),	width = 1440, height = 960, res = 108)
     par(mfrow = c(2, 3 ))
     
     hist(dataI$EFFECT,
@@ -1578,7 +1591,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   gc(verbose = FALSE) # memory cleaning
   if(plot_output$lambda[1] > 1.1 & !is.na(plot_output$lambda[1])) {
     save_log(phaseL = 5L, checkL = "QC statistics", typeL = "high lambda", SNPL = sum(!is.na(dataI$PVALUE)), allSNPs = SNPn_postQC, actionL = "-", noteL = paste("Lambda =", plot_output$lambda[1]), fileL = filename_dir)
-    print(paste(" - - warning: high lambda value (", plot_output$lambda[1], ")", sep = ""), quote = FALSE) }
+    print(paste0(" - - warning: high lambda value (", plot_output$lambda[1], ")"), quote = FALSE) }
   if(plot_Manhattan & !useMan) {
     save_log(phaseL = 5L, checkL = "Manhattan plot", typeL = "insuf. data", SNPL = sum(iNA$chr | inv$chr | iNA$pos | inv$pos), allSNPs = SNPn_postQC, actionL = "-", noteL = "Insufficient known chromosome/positions to create Manhattan plot", fileL = filename_dir)
     print(" - - warning: insufficient chromosome/position values to generate Manhattan plot", quote = FALSE)
@@ -1603,12 +1616,12 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
       stat_Vissc_HQ <- median( 1 / (2 * dataI$EFF_ALL_FREQ[HQ_list] * (1-dataI$EFF_ALL_FREQ[HQ_list]) * (dataI$STDERR[HQ_list])^2 ), na.rm = iNA_FRQ_N+inv_FRQ_N>0L) / stat_N_max
     } else {
       stat_Vissc_HQ <- NA
-      if(is.na(stat_N_HQ))		                			save_log(4L, "Visscher's stat.", "Insufficient data", SNPn_postQC, SNPn_postQC, "-", "Insufficient sample sizes to calculate Visscher's statistic: too few high-quality markers", filename_dir)
-      if(sum(!iNA$FRQ & !inv$FRQ & HQ_list) <= 9L)	save_log(4L, "Visscher's stat.", "Insufficient data", SNPn_postQC, SNPn_postQC, "-", "Insufficient allele frequencies to calculate Visscher's statistic: too few high-quality markers", filename_dir)
+      if(is.na(stat_N_HQ))		                			save_log(4L, "Visschers stat.", "Insufficient data", SNPn_postQC, SNPn_postQC, "-", "Insufficient sample sizes to calculate Visschers statistic: too few high-quality markers", filename_dir)
+      if(sum(!iNA$FRQ & !inv$FRQ & HQ_list) <= 9L)	save_log(4L, "Visschers stat.", "Insufficient data", SNPn_postQC, SNPn_postQC, "-", "Insufficient allele frequencies to calculate Visschers statistic: too few high-quality markers", filename_dir)
     }
   } else {
-    if(!useFRQ) save_log(4L, "Visscher's stat.", "Insufficient data", SNPn_postQC, SNPn_postQC, "-", "Insufficient allele frequencies to calculate Visscher's statistic", filename_dir)
-    if(is.na(stat_N_max)) save_log(4L, "Visscher's stat", "Insufficient data", SNPn_postQC, SNPn_postQC, "-", "Insufficient sample sizes to calculate Visscher's statistic", filename_dir)
+    if(!useFRQ) save_log(4L, "Visschers stat.", "Insufficient data", SNPn_postQC, SNPn_postQC, "-", "Insufficient allele frequencies to calculate Visschers statistic", filename_dir)
+    if(is.na(stat_N_max)) save_log(4L, "Visschers stat", "Insufficient data", SNPn_postQC, SNPn_postQC, "-", "Insufficient sample sizes to calculate Visschers statistic", filename_dir)
     stat_Visscher <- NA
     stat_Vissc_HQ <- NA
   }
@@ -1621,29 +1634,75 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   stat_kurtosis_HQ	<- if(useHQ) calc_kurtosis(input = dataI$EFFECT[HQ_list]) else NA
   
   
-  filename_stat <- paste(filename_dir, "_log.txt", sep = "")
-  write.table(data.frame(col1 = c("", "", "", "QC STATISTICS for", ""), col2 = vector(mode = "character", length = 5), col1 = c("", "", "", filename_input, ""), stringsAsFactors = FALSE),
-              filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-    
-  ### Tables of removed SNPs
+  # Reformatting the old log entries log file
+  log_old <- read.table(paste0(filename_dir, "_log.txt"), header = FALSE,
+                        sep = "\t", comment.char = "", stringsAsFactors = FALSE)
+  
+  write.table(c(
+    "*********************************",
+    "",
+    "\t\tQC LOG FILE",
+    "",
+    "*********************************",
+    ""), paste0(filename_dir, "_log.txt"), append = FALSE,
+              quote = FALSE, row.names = FALSE, col.names = FALSE)
+  
+  SFL <- spreadsheet_friendly_log
+  
+  logCon <- file(description = paste0(filename_dir, "_log.txt"),
+                 open = "a")
+  
+  if(SFL) {
+    write.table(data.frame(
+      v1 = c("Input File", "output File(s)", "QC Start Time", "QC End time", "Script version"),
+      v2 = "", v3 = c(filename_input, filename, start_time, date(), "1.0-7"),
+      stringsAsFactors = FALSE),
+                logCon, quote = FALSE,
+                sep = "\t", row.names = FALSE, col.names = FALSE)
+  } else {
+    write.table(format(
+      data.frame(
+        v1 = c("Input File", "output File(s)", "QC Start Time", "QC End time", "Script version"),
+        v2 = "\t: ", v3 = c(filename_input, filename, start_time, date(), "1.0-7"),
+        stringsAsFactors = FALSE), justify = "left"),
+                logCon, quote = FALSE,
+                sep = "", row.names = FALSE, col.names = FALSE)
+  }
+  
+  write.table(c("", "",
+                "****************************************",
+                "\t1. Log entries generated during QC",
+                "****************************************",
+                ""), logCon, quote = FALSE,
+              row.names = FALSE, col.names = FALSE)
+  write.table(if(SFL) log_old else format(log_old, justify = "left"),
+              logCon, quote = FALSE,
+              sep = if(SFL) "\t" else "   ", row.names = FALSE, col.names = FALSE)
+  rm(log_old)
+  
+  write.table(c("", "",
+                "*******************************************",
+                "\t2. Summary statistics of removed SNPs",
+                "*******************************************",
+                ""), logCon, quote = FALSE,
+              row.names = FALSE, col.names = FALSE)
+  
+  
   del_table <- data.frame(
     # Statistics of remove 1: monomorphic, Y- & M-chr SNPs
-    name1 = c("SNPs in uploaded data", "Removed", "> Monomorphic", ">> missing non-effect allele", ">> invalid non-effect allele", ">> allele frequency = 0", ">> identical alleles*", if(remove_X) "> X chromosome" else ">", if(remove_Y) "> Y chromosome" else ">", if(remove_XY) "> XY chromosome" else ">", if(remove_M) "> M chromosome" else ">", NA, NA, "* Not including SNPs with allele frequency = 0"),
-    em2 = vector(mode = "character", length = 14),
+    name1 = c("SNPs in uploaded data", "Removed", "> Monomorphic", ">> missing non-effect allele", ">> invalid non-effect allele", ">> allele frequency = 0", ">> identical alleles*", if(remove_X) "> X chromosome" else ">", if(remove_Y) "> Y chromosome" else ">", if(remove_XY) "> XY chromosome" else ">", if(remove_M) "> M chromosome" else ">", "", "", ""),
     N1 = c(SNPn_input, remove_L0_N, monomorp_N, iNA_al2_N, inv_al2_N, low_FRQ_N, same_al_N, chr_X_N, chr_Y_N, chr_XY_N, chr_M_N, NA, NA, NA),
-    perc1 = vector(mode = "numeric", length = 14),
-    em5 = vector(mode = "character", length = 14),
+    perc1 = numeric(length = 14),
+    em4 = character(length = 14),
     # Statistics of remove 2: missing & invalid crucial variables
     name2 = c("SNPs in initial QC", "Removed", "> Marker name", ">> missing", ">> duplicate", "> Effect allele", ">> missing", ">> invalid", "> Effect size (missing)", ">> low imputation quality", "> Standard error", ">> missing", ">>> low imputation quality", ">> invalid"),
-    em7 = vector(mode = "character", length = 14),
-    N2 = c(SNPn_preQC, remove_L1_N, iNA_mar_N + SNPn_preQC_dupli, iNA_mar_N, SNPn_preQC_dupli, iNA_al1_N + inv_al1_N, iNA_al1_N, inv_al1_N, iNA_eff_N, iNA_eff_poor, iNA_se_N + inv_se_N, iNA_se_N, iNA_se_poor,	inv_se_N),
-    perc2 = vector(mode = "numeric", length = 14),
-    em10 = vector(mode = "character", length = 14),
+    N2 = c(SNPn_preQC, remove_L1_N, iNA_mar_N + SNPn_preQC_dupli, iNA_mar_N, SNPn_preQC_dupli, iNA_al1_N + inv_al1_N, iNA_al1_N, inv_al1_N, iNA_eff_N, iNA_eff_poor, iNA_se_N + inv_se_N, iNA_se_N, iNA_se_poor,  inv_se_N),
+    perc2 = numeric(length = 14),
+    em8 = character(length = 14),
     # Statistics of remove 3: allele mismatches & FINAL statistics
-    name3 = c(vector(mode = "character", length = 10), "Final dataset", "SNPs", "> genotyped", "> imputed"),
-    em12 = vector(mode = "character", length = 14),
+    name3 = c(character(length = 10), "Final dataset", "SNPs", "> genotyped", "> imputed"),
     N3 = c(rep(NA, 11), SNPn_postQC, SNPn_postQC_geno, SNPn_postQC_imp),
-    perc3 = vector(mode = "numeric", length = 14),
+    perc3 = numeric(length = 14),
     stringsAsFactors = FALSE)
   del_table$perc1 <- round(100 * del_table$N1 / SNPn_input, digits = 2)
   del_table$perc2 <- round(100 * del_table$N2 / SNPn_preQC, digits = 2)
@@ -1673,296 +1732,387 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
     } else { del_table$name3[6] <- ">" }
     
     del_table$perc3[1:6] <- round(100 * del_table$N3[1:6] / SNPn_ref, digits = 2)
-    write.table(t(c("", "", "N", "%", "", "", "", "N", "%", "", "", "", "N", "%")), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-  } else { write.table(t(c("", "", "N", "%", "", "", "", "N", "%")), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t") }
-  del_table[11, c("N3", "perc3")] <- c("N", "%")
-  write.table(del_table, filename_stat, na = "", append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-  write.table(data.frame(col1 = vector(mode = "character", length = 5),
-                         col2 = c("NB: monomorphic & Y- & M-chromosome SNPs are removed before the analysis starts.",
-                                  "The pre-QC values in the tables below refer to the dataset after these SNPs have been",
-                                  "removed, but before further exclusions have taken place.", "", ""), stringsAsFactors = FALSE),
-              filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
- 
+  }
   
-  ### Tables of values
-  write.table(t(c("",	 "",	 "Pre-QC", "",		"", 		"Post-QC")), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-  write.table(t(c("Statistics", "",	 "missing", "invalid", "%unusable", "missing", "invalid", "%unusable", "min", "25%", "mean", "median", "75%", "max")), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+  # adding the header line
+  del_table <- rbind(character(length = 11), del_table)
+  del_table[1, ] <- if(remove_mismatches_std | remove_mismatches_alt | remove_diffEAF_std | remove_diffEAF_alt) {
+    c("", "N", "%", "", "", "N", "%", "", "", "N", "%")
+  } else { c("", "N", "%", "", "", "N", "%", "", "", "", "") }
+  del_table[12, c("N3", "perc3")] <- c("N", "%")
+  
+  # Changing NA's to empty cells
+  del_table$N1 <- ifelse(is.na(del_table$N1), "", del_table$N1)
+  del_table$perc1 <- ifelse(is.na(del_table$perc1), "", del_table$perc1)
+  del_table$N3 <- ifelse(is.na(del_table$N3), "", del_table$N3)
+  del_table$perc3 <- ifelse(is.na(del_table$perc3), "", del_table$perc3)
+  
+  write.table(if(SFL) del_table else format(del_table, justify = "left"),
+              logCon, quote = FALSE,
+              sep = if(SFL) "\t" else "   ", row.names = FALSE, col.names = FALSE)
+  rm(del_table)
+  
+  
+  write.table(c("* Not including SNPs with allele frequency = 0",
+                "     NB: monomorphic & Y- & M-chromosome SNPs are removed before the analysis starts.",
+                "     The pre-QC values in the tables below refer to the dataset after these SNPs have been",
+                "     removed, but before further exclusions have taken place.",
+                "", "",
+                "********************************************************************",
+                "\t3. Summary statistics before and after quality check procedure",
+                "********************************************************************",
+                ""),
+              logCon, quote = FALSE, row.names = FALSE, col.names = FALSE)
+  
+  stat_table <- data.frame(variable = character(18),
+                           NA_pre = character(18), inv_pre = character(18), unus_pre = character(18),
+                           NA_post = character(18), inv_post = character(18), unus_post = character(18),
+                           Qmin = character(18), Q25 = character(18), Qmean = character(18), Qmedian = character(18), Q75 = character(18), Qmax = character(18),
+                           stringsAsFactors = FALSE)
+  
+  stat_table[1, 2] <- "Pre-QC"
+  stat_table[1, 5] <- "Post-QC"
+  stat_table[2,  ] <- c("Statistics", "missing", "invalid", "%unusable", "missing", "invalid", "%unusable", "min", "25%", "mean", "median", "75%", "max")
   
   stat_save <- function(stat_name, stat_col, old_N, old_NA, old_inv,
                         new_N = length(stat_col), new_NA = sum(is.na(stat_col)) - new_inv, new_inv,
-                        filename, no_quantiles = FALSE) {
+                        no_quantiles = FALSE) {
     if(no_quantiles | new_NA + new_inv == new_N) {
-      write.table(t(c(stat_name, "", old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2) )), filename, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+      return(c(stat_name, old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2), character(6) ))
     } else {
-      write.table(t(c(stat_name, "", old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2), c(mean(stat_col, na.rm = new_NA + new_inv > 0L), quantile(stat_col, na.rm = new_NA + new_inv > 0L, names = FALSE))[c(2,3,1,4,5,6)])), filename, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+      quant <- quantile(stat_col, na.rm = new_NA + new_inv > 0L, names = FALSE)
+      return(c(stat_name, old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2), signif(quant[1], digits = 2), round(c(mean(stat_col, na.rm = new_NA + new_inv > 0L), quant)[c(3,1,4,5,6)], digits = 4)))
     }
-    return(invisible())
   }
-  stat_select_save <- function(stat_name, select_name, filename, 
+  stat_select_save <- function(stat_name, select_name,
                                stat_col, NA_col = is.na(stat_col) & !inv_col, inv_col, select_col,
                                old_N, old_NA, old_inv,
                                new_N = sum(select_col), new_NA = sum(select_col & NA_col), new_inv = sum(select_col & inv_col) ) {
     if(old_N == 0L) {
-      write.table(t(c(paste(stat_name, "-", select_name), "", paste("No", select_name, "SNPs were found"))), filename, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+      return(c(paste(stat_name, "-", select_name), "-", "-", "-", "-", "-", "-", character(6)))
     } else {
       if(new_N == 0L) {
-        write.table(t(c(paste(stat_name, "-", select_name), "", old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), paste("All", select_name, "SNPs were excluded"))), filename, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+        return(c(paste(stat_name, "-", select_name), old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), "-", "-", "-", character(6)))
       } else {
         new_inv <- sum(select_col & inv_col)
-        new_NA	<- sum(select_col & NA_col)
+        new_NA  <- sum(select_col & NA_col)
         if(new_NA + new_inv == new_N) {
-          write.table(t(c(paste(stat_name, "-", select_name), "", old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2) )), filename, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+          return(c(paste(stat_name, "-", select_name), old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2), character(6)))
         } else {
-          write.table(t(c(paste(stat_name, "-", select_name), "", old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2), c(mean(stat_col[select_col], na.rm = new_NA + new_inv > 0L), quantile(stat_col[select_col], na.rm = new_NA + new_inv > 0L, names = FALSE))[c(2,3,1,4,5,6)])), filename, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+          quant <- quantile(stat_col[select_col], na.rm = new_NA + new_inv > 0L, names = FALSE)
+          return(c(paste(stat_name, "-", select_name), old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2), signif(quant[1], digits = 2), round(c(mean(stat_col[select_col], na.rm = new_NA + new_inv > 0L), quant)[c(3,1,4,5,6)], digits = 4)))
         } } }
-    return(invisible())
   }
   
-  stat_save(stat_name = "effect size", stat_col = dataI$EFFECT, old_N = SNPn_preQC, old_NA = iNA_eff_N, old_inv = 0, new_N = SNPn_postQC, new_NA = 0, new_inv = 0, filename = filename_stat)
-  stat_save(stat_name = "SE", stat_col = dataI$STDERR, old_N = SNPn_preQC, old_NA = iNA_se_N, old_inv = inv_se_N, new_N = SNPn_postQC, new_NA = 0, new_inv = 0, filename = filename_stat)
-  stat_save(stat_name = "p-value", stat_col = dataI$PVALUE, old_N = SNPn_preQC, old_NA = iNA_p_N, old_inv = inv_p_N, new_N = SNPn_postQC, new_NA = sum(iNA$p), new_inv = sum(inv$p), filename = filename_stat)
-  stat_save(stat_name = "allele frequency", stat_col = dataI$EFF_ALL_FREQ, old_N = SNPn_preQC, old_NA = iNA_FRQ_N, old_inv = inv_FRQ_N, new_N = SNPn_postQC, new_NA = sum(iNA$FRQ), new_inv = sum(inv$FRQ), filename = filename_stat)
-  stat_save(stat_name = "HWE p-value", stat_col = dataI$HWE_PVAL, old_N = SNPn_preQC, old_NA = iNA_HWE_N, old_inv = inv_HWE_N, new_N = SNPn_postQC, new_NA = sum(iNA$HWE), new_inv = sum(inv$HWE), filename = filename_stat)
-  stat_select_save(stat_name = "HWE p-value", select_name = "genotyped", stat_col = dataI$HWE_PVAL, NA_col = iNA$HWE, inv_col = inv$HWE,
-                   select_col = geno_list,	old_N = SNPn_preQC_geno, old_NA = iNA_HWE_g, old_inv = inv_HWE_g, new_N = SNPn_postQC_geno, filename = filename_stat)
-  stat_select_save(stat_name = "HWE p-value", select_name = "imputed", stat_col = dataI$HWE_PVAL, NA_col = iNA$HWE, inv_col = inv$HWE,
-                   select_col =	imp_list,	old_N = SNPn_preQC_imp, old_NA = iNA_HWE_i, old_inv = inv_HWE_i, new_N = SNPn_postQC_imp, filename = filename_stat)
-  stat_save(stat_name = "Call rate", stat_col = dataI$CALLRATE, old_N = SNPn_preQC, old_NA = iNA_cal_N, old_inv = inv_cal_N, new_N = SNPn_postQC, new_NA = sum(iNA$cal), new_inv = sum(inv$cal), filename = filename_stat)
-  stat_select_save(stat_name = "Call rate", select_name = "genotyped", stat_col = dataI$CALLRATE, NA_col = iNA$cal, inv_col = inv$cal,
-                   select_col = geno_list,	old_N = SNPn_preQC_geno, old_NA = iNA_cal_g, old_inv = inv_cal_g, new_N = SNPn_postQC_geno, filename = filename_stat)
-  stat_select_save(stat_name = "Call rate", select_name = "imputed", stat_col = dataI$CALLRATE, NA_col = iNA$cal, inv_col = inv$cal,
-                   select_col =	imp_list,	old_N = SNPn_preQC_imp, old_NA = iNA_cal_i, old_inv = inv_cal_i, new_N = SNPn_postQC_imp, filename = filename_stat)
-  stat_save(stat_name = "Sample size", stat_col = dataI$N_TOTAL, old_N = SNPn_preQC, old_NA = iNA_N_N, old_inv = inv_N_N, new_N = SNPn_postQC, new_NA = sum(iNA$N), new_inv = sum(inv$N), filename = filename_stat)
-  stat_select_save(stat_name = "Sample size", select_name = "genotyped", stat_col = dataI$N_TOTAL, NA_col = iNA$N, inv_col = inv$N,
-                   select_col = geno_list,	old_N = SNPn_preQC_geno, old_NA = iNA_N_g, old_inv = inv_N_g, new_N = SNPn_postQC_geno, filename = filename_stat)
-  stat_select_save(stat_name = "Sample size", select_name = "imputed", stat_col = dataI$N_TOTAL, NA_col = iNA$N, inv_col = inv$N,
-                   select_col =	imp_list,	old_N = SNPn_preQC_imp, old_NA = iNA_N_i, old_inv = inv_N_i, new_N = SNPn_postQC_imp, filename = filename_stat)
-  stat_save(stat_name = "Imputation quality", stat_col = dataI$IMP_QUALITY, old_N = SNPn_preQC, old_NA = iNA_impQ_N, old_inv = inv_impQ_N, new_N = SNPn_postQC, new_NA = sum(iNA$impQ), new_inv = sum(inv$impQ), filename = filename_stat)
-  stat_select_save(stat_name = "Imputation quality", select_name = "genotyped", stat_col = dataI$IMP_QUALITY, NA_col = iNA$impQ, inv_col = inv$impQ,
-                   select_col = geno_list,	old_N = SNPn_preQC_geno, old_NA = iNA_impQ_g, old_inv = inv_impQ_g, new_N = SNPn_postQC_geno, filename = filename_stat)
-  stat_select_save(stat_name = "Imputation quality", select_name = "imputed", stat_col = dataI$IMP_QUALITY, NA_col = iNA$impQ, inv_col = inv$impQ,
-                   select_col =	imp_list,	old_N = SNPn_preQC_imp, old_NA = iNA_impQ_i, old_inv = inv_impQ_i, new_N = SNPn_postQC_imp, filename = filename_stat)
+  stat_table[ 3, ] <- stat_save(stat_name = "effect size", stat_col = dataI$EFFECT, old_N = SNPn_preQC, old_NA = iNA_eff_N, old_inv = 0, new_N = SNPn_postQC, new_NA = 0, new_inv = 0)
+  stat_table[ 4, ] <- stat_save(stat_name = "SE", stat_col = dataI$STDERR, old_N = SNPn_preQC, old_NA = iNA_se_N, old_inv = inv_se_N, new_N = SNPn_postQC, new_NA = 0, new_inv = 0)
+  stat_table[ 5, ] <- stat_save(stat_name = "p-value", stat_col = dataI$PVALUE, old_N = SNPn_preQC, old_NA = iNA_p_N, old_inv = inv_p_N, new_N = SNPn_postQC, new_NA = sum(iNA$p), new_inv = sum(inv$p))
+  stat_table[ 6, ] <- stat_save(stat_name = "allele frequency", stat_col = dataI$EFF_ALL_FREQ, old_N = SNPn_preQC, old_NA = iNA_FRQ_N, old_inv = inv_FRQ_N, new_N = SNPn_postQC, new_NA = sum(iNA$FRQ), new_inv = sum(inv$FRQ))
+  stat_table[ 7, ] <- stat_save(stat_name = "HWE p-value", stat_col = dataI$HWE_PVAL, old_N = SNPn_preQC, old_NA = iNA_HWE_N, old_inv = inv_HWE_N, new_N = SNPn_postQC, new_NA = sum(iNA$HWE), new_inv = sum(inv$HWE))
+  stat_table[ 8, ] <- stat_select_save(stat_name = "HWE p-value", select_name = "genotyped", stat_col = dataI$HWE_PVAL, NA_col = iNA$HWE, inv_col = inv$HWE,
+                                       select_col = geno_list,  old_N = SNPn_preQC_geno, old_NA = iNA_HWE_g, old_inv = inv_HWE_g, new_N = SNPn_postQC_geno)
+  stat_table[ 9, ] <- stat_select_save(stat_name = "HWE p-value", select_name = "imputed", stat_col = dataI$HWE_PVAL, NA_col = iNA$HWE, inv_col = inv$HWE,
+                                       select_col =  imp_list,  old_N = SNPn_preQC_imp, old_NA = iNA_HWE_i, old_inv = inv_HWE_i, new_N = SNPn_postQC_imp)
+  stat_table[10, ] <- stat_save(stat_name = "Call rate", stat_col = dataI$CALLRATE, old_N = SNPn_preQC, old_NA = iNA_cal_N, old_inv = inv_cal_N, new_N = SNPn_postQC, new_NA = sum(iNA$cal), new_inv = sum(inv$cal))
+  stat_table[11, ] <- stat_select_save(stat_name = "Call rate", select_name = "genotyped", stat_col = dataI$CALLRATE, NA_col = iNA$cal, inv_col = inv$cal,
+                                       select_col = geno_list,	old_N = SNPn_preQC_geno, old_NA = iNA_cal_g, old_inv = inv_cal_g, new_N = SNPn_postQC_geno)
+  stat_table[12, ] <- stat_select_save(stat_name = "Call rate", select_name = "imputed", stat_col = dataI$CALLRATE, NA_col = iNA$cal, inv_col = inv$cal,
+                                       select_col =	imp_list,	old_N = SNPn_preQC_imp, old_NA = iNA_cal_i, old_inv = inv_cal_i, new_N = SNPn_postQC_imp)
+  stat_table[13, ] <- stat_save(stat_name = "Sample size", stat_col = dataI$N_TOTAL, old_N = SNPn_preQC, old_NA = iNA_N_N, old_inv = inv_N_N, new_N = SNPn_postQC, new_NA = sum(iNA$N), new_inv = sum(inv$N))
+  stat_table[14, ] <- stat_select_save(stat_name = "Sample size", select_name = "genotyped", stat_col = dataI$N_TOTAL, NA_col = iNA$N, inv_col = inv$N,
+                                       select_col = geno_list,	old_N = SNPn_preQC_geno, old_NA = iNA_N_g, old_inv = inv_N_g, new_N = SNPn_postQC_geno)
+  stat_table[15, ] <- stat_select_save(stat_name = "Sample size", select_name = "imputed", stat_col = dataI$N_TOTAL, NA_col = iNA$N, inv_col = inv$N,
+                                       select_col =	imp_list,	old_N = SNPn_preQC_imp, old_NA = iNA_N_i, old_inv = inv_N_i, new_N = SNPn_postQC_imp)
+  stat_table[16, ] <- stat_save(stat_name = "Imputation quality", stat_col = dataI$IMP_QUALITY, old_N = SNPn_preQC, old_NA = iNA_impQ_N, old_inv = inv_impQ_N, new_N = SNPn_postQC, new_NA = sum(iNA$impQ), new_inv = sum(inv$impQ))
+  stat_table[17, ] <- stat_select_save(stat_name = "Imp. quality", select_name = "genotyped", stat_col = dataI$IMP_QUALITY, NA_col = iNA$impQ, inv_col = inv$impQ,
+                                       select_col = geno_list,	old_N = SNPn_preQC_geno, old_NA = iNA_impQ_g, old_inv = inv_impQ_g, new_N = SNPn_postQC_geno)
+  stat_table[18, ] <- stat_select_save(stat_name = "Imp. quality", select_name = "imputed", stat_col = dataI$IMP_QUALITY, NA_col = iNA$impQ, inv_col = inv$impQ,
+                                       select_col =	imp_list,	old_N = SNPn_preQC_imp, old_NA = iNA_impQ_i, old_inv = inv_impQ_i, new_N = SNPn_postQC_imp)
+  write.table(if(SFL) stat_table else format(stat_table, justify = "left"),
+              logCon, quote = FALSE,
+              sep = if(SFL) "\t" else "   ", row.names = FALSE, col.names = FALSE)
+  rm(stat_table)
   
-  
-  ### Tables of allele check
-  write.table(c("", ""), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-  write.table(t(c("Combined", "", "N", "%", "", allele_name_std, "", "N", "%", "", allele_name_alt, "", "N", "%", "", if(update_alt) { paste("Updated", allele_name_alt) } else { "Other SNPs" }, "", "N", "%")), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+  write.table(c("", "",
+                "************************",
+                "\t4. Allele matching",
+                "************************",
+                ""),
+              logCon, quote = FALSE, row.names = FALSE, col.names = FALSE)
   
   all_table0 <- data.frame(
-    names = c("SNPs", "> negative strand", "> strand switch", ">> double strand switch",
-              ">> MISMATCH", ">>> mismatch & double strand switch",
-              "> flipped", "> ambiguous", ">> MAF between 35 and 65%", "> deviating allele frequency"),
-    empty = vector(mode = "character", length = 10),
-    N = vector(mode = "integer", length = 10),
-    perc = vector(mode = "numeric", length = 10),
-    stringsAsFactors = FALSE)
+    names = c("SNPs", "> negative strand", "> strand switch (SS)", ">> double SS",
+              ">> MISMATCH", ">>> mismatch & double SS",
+              "> flipped", "> ambiguous", ">> MAF between 35 & 65%", "> deviating allele frequency"),
+    N = integer(length = 10), perc = numeric(length = 10), stringsAsFactors = FALSE)
   
   if(use_allele_std & SNPn_ref_std > 0L) {
     all_table1 <- all_table0
-    all_table1$N <- c(allele_out_std$n_SNPs, if(strand_ref$minus == 0L) { 0L } else { allele_out_std$n_negative_strand }, allele_out_std$n_strandswitch, if(strand_ref$minus == 0L) { 0L } else { allele_out_std$n_negative_switch },
-                      allele_out_std$n_mismatch, if(strand_ref$minus == 0L) { 0L } else { allele_out_std$n_negative_mismatch },
+    all_table1$N <- c(allele_out_std$n_SNPs, if(strand_ref$minus == 0L) 0L else allele_out_std$n_negative_strand, allele_out_std$n_strandswitch, if(strand_ref$minus == 0L) 0L else allele_out_std$n_negative_switch,
+                      allele_out_std$n_mismatch, if(strand_ref$minus == 0L) 0L else allele_out_std$n_negative_mismatch,
                       allele_out_std$n_flipped, allele_out_std$n_ambiguous, allele_out_std$n_suspect, allele_out_std$n_diffEAF)
     all_table1$perc <- round(100 * all_table1$N/SNPn_ref, digits = 2)
     all_table0$N <- all_table1$N
-  } else { all_table1 <- cbind(all_table0$names, vector(mode = "character", length = 10), matrix(data = NA, nrow = 10, ncol = 2)) }
+    
+    all_table1$N    <- ifelse(is.na(all_table1$N   ), "-", as.character(all_table1$N   ))
+    all_table1$perc <- ifelse(is.na(all_table1$perc), "-", as.character(all_table1$perc))
+  } else { all_table1 <- cbind(all_table0$names, matrix(data = "-", nrow = 10, ncol = 2)) }
   
   if(use_allele_alt & SNPn_ref_alt > 0L) {
     all_table2 <- all_table0
-    all_table2$N <- c(allele_out_alt$n_SNPs, if(strand_ref$minus == 0L) { 0L } else { allele_out_alt$n_negative_strand }, allele_out_alt$n_strandswitch, if(strand_ref$minus == 0L) { 0L } else { allele_out_alt$n_negative_switch },
-                      allele_out_alt$n_mismatch, if(strand_ref$minus == 0L) { 0L } else { allele_out_alt$n_negative_mismatch },
+    all_table2$N <- c(allele_out_alt$n_SNPs, if(strand_ref$minus == 0L) 0L else allele_out_alt$n_negative_strand, allele_out_alt$n_strandswitch, if(strand_ref$minus == 0L) 0L else allele_out_alt$n_negative_switch,
+                      allele_out_alt$n_mismatch, if(strand_ref$minus == 0L) 0L else allele_out_alt$n_negative_mismatch,
                       allele_out_alt$n_flipped, allele_out_alt$n_ambiguous, allele_out_alt$n_suspect, allele_out_alt$n_diffEAF)
     all_table2$perc <- round(100 * all_table2$N/SNPn_ref, digits = 2)
     all_table0$N <- all_table0$N + all_table2$N
-  } else { all_table2 <- cbind(all_table0$names, vector(mode = "character", length = 10), matrix(data = NA, nrow = 10, ncol = 2)) }
+    
+    all_table2$N    <- ifelse(is.na(all_table2$N   ), "-", as.character(all_table2$N   ))
+    all_table2$perc <- ifelse(is.na(all_table2$perc), "-", as.character(all_table2$perc))
+  } else { all_table2 <- cbind(all_table0$names, matrix(data = "-", nrow = 10, ncol = 2)) }
   
   if(SNPn_ref_new > 0L) {
     all_table3 <- all_table0
-    all_table3$N <- c(SNPn_ref_new, if(strand_ref$minus == 0L) { 0L } else { allele_out_new$n_negative_strand }, NA, NA,
+    all_table3$N <- c(SNPn_ref_new, if(strand_ref$minus == 0L) 0L else allele_out_new$n_negative_strand, NA, NA,
                       NA, NA, allele_out_new$n_flipped, allele_out_new$n_ambiguous, NA, NA)
     all_table3$perc <- round(100 * all_table3$N/SNPn_ref, digits = 2)
-    all_table0$N[c(1,2,7,8,9)] <- all_table0$N[c(1,2,7,8,9)] + all_table3$N[c(1,2,7,8,9)]
-  } else { all_table3 <- cbind(all_table0$names, vector(mode = "character", length = 10), c(0, rep(NA, 9)), c(0, rep(NA, 9))) }
+    all_table0$N[c(1,2,7,8)] <- all_table0$N[c(1,2,7,8)] + all_table3$N[c(1,2,7,8)]
+    
+    all_table3$N    <- ifelse(is.na(all_table3$N   ), "-", as.character(all_table3$N   ))
+    all_table3$perc <- ifelse(is.na(all_table3$perc), "-", as.character(all_table3$perc))
+  } else { all_table3 <- cbind(all_table0$names, c("0", rep("-", 9)), c("0", rep("-", 9))) }
   
   all_table0$perc <- round(100 * all_table0$N/SNPn_ref, digits = 2)
+  all_table0$N    <- ifelse(is.na(all_table0$N   ), "-", as.character(all_table0$N   ))
+  all_table0$perc <- ifelse(is.na(all_table0$perc), "-", as.character(all_table0$perc))
   
-  write.table(cbind(all_table0, vector(mode = "character", length = 10), all_table1, vector(mode = "character", length = 10), all_table2, vector(mode = "character", length = 10), all_table3, vector(mode = "character", length = 10)),
-              filename_stat, na = "-", append = TRUE, col.names = FALSE, row.names = FALSE, quote = FALSE, sep = "\t")
   
-  
-  ### Tables of other statistics
-  write.table(c("", ""), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")  
-  stat_table2 <- data.frame(name1 = c("r", "Lambda", "> genotyped", "> imputed", "", ""),
-                            em3 = vector(mode = "character", length = 6), 
-                            stat1 = c(round(outcome_P, digits = 3), round(plot_output$lambda, digits = 3), NA, NA),
-                            em4 = vector(mode = "character", length = 6),
-                            name2 = c("SE median", "Skewness", "Kurtosis", "Visscher's statistic", "* high-quality SNPs only", ""),
-                            em5 = vector(mode = "character", length = 6), 
-                            stat2all = c(stat_SE, stat_skewness, stat_kurtosis, stat_Visscher, NA, NA),
-                            stat2_HQ = c(stat_SE_HQ, stat_skewness_HQ, stat_kurtosis_HQ, stat_Vissc_HQ, NA, NA),
-                            em6 = vector(mode = "character", length = 6),
-                            Nname = c("Negative strand SNPs", "High-quality SNPs", "Corrected p-values", "Extreme p-values", "", ""),
-                            em7 = vector(mode = "character", length = 6), 
-                            NN = c(strand_post$minus, SNPn_postQC_HQ, calc_p_newN, low_p_newN, NA, NA),
-                            Nperc = vector(mode = "numeric", length = 6), stringsAsFactors = FALSE)
-  stat_table2$Nperc <- round(100*stat_table2$NN/SNPn_postQC, digits = 2)		
-  if(!calculate_missing_p) { stat_table2[3:4, c("NN", "Nperc")] <- "-" }
-  if(!useMan | !plot_Manhattan) { stat_table2[5:6, c("NN", "Nperc")] <- "-" }
-  if(use_allele_std | use_allele_alt) {
-    write.table(t(c("Allele-frequency correlation", "", "", "", "P-value corr.", "", "", "", "QC stats", "", "all SNPs", "*HQ SNPs", "", "Other", "", "N", "%")), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-    stat_table1 <- data.frame(allname = c(allele_name_std, "> ambiguous SNPs", "> non-ambiguous SNPs", allele_name_alt, "> ambiguous SNPs", "> non-ambiguous SNPs"),
-                              em1 = vector(mode = "character", length = 6), 
-                              allcor = round(c(allele_out_std$FRQ_cor, allele_out_std$FRQ_cor_ambiguous, allele_out_std$FRQ_cor_nonambi, allele_out_alt$FRQ_cor, allele_out_alt$FRQ_cor_ambiguous, allele_out_alt$FRQ_cor_nonambi), digits = 3),
-                              em2 = vector(mode = "character", length = 6), stringsAsFactors = FALSE)
-    if(!check_ambiguous_alleles) { stat_table1[c(2,3,5,6), 3] <- "-" }
-    if(!use_allele_alt) { stat_table1[c(4,5,6), 3] <- "-" }
-    write.table(cbind(stat_table1, stat_table2), filename_stat, na = "", append = TRUE, col.names = FALSE, row.names = FALSE, quote = FALSE, sep = "\t")
+  # Combining tables & adding header line
+  write.table(if(SFL) {
+    rbind(c("Combined", "N", "%", "", allele_name_std, "N", "%", "", allele_name_alt, "N", "%", "", if(update_alt) paste("Updated", allele_name_alt) else "Other SNPs", "N", "%"),
+          cbind(all_table0, character(length = 10), all_table1, character(length = 10), all_table2, character(length = 10), all_table3, stringsAsFactors = F))
   } else {
-    write.table(t(c("P-value corr.", "", "", "", "QC stats", "", "all SNPs", "*HQ SNPs", "", "Other", "", "N", "%")), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-    write.table(stat_table2, filename_stat, na = "", append = TRUE, col.names = FALSE, row.names = FALSE, quote = FALSE, sep = "\t")
+    format(rbind(c("Combined", "N", "%", "", allele_name_std, "N", "%", "", allele_name_alt, "N", "%", "", if(update_alt) paste("Updated", allele_name_alt) else "Other SNPs", "N", "%"),
+                 cbind(all_table0, character(length = 10), all_table1, character(length = 10), all_table2, character(length = 10), all_table3, stringsAsFactors = F)), justify = "left") },
+              logCon, quote = FALSE, sep = if(SFL) "\t" else "   ", row.names = FALSE, col.names = FALSE)
+  rm(all_table0, all_table1, all_table2, all_table3)
+  
+  
+  write.table(c("", "",
+                "**********************",
+                "\t5. QC statistics",
+                "**********************",
+                ""),
+              logCon, quote = FALSE, row.names = FALSE, col.names = FALSE)
+  
+  
+  stat_table <- data.frame(allname = c(allele_name_std, "> ambiguous SNPs", "> non-ambiguous SNPs", allele_name_alt, "> ambiguous SNPs", "> non-ambiguous SNPs"),
+                           allcor = "-",
+                           em1 = character(length = 6),
+                           name1 = c("r", "Lambda", "> genotyped", "> imputed", "", ""),
+                           stat1 = c(round(outcome_P, digits = 3), round(plot_output$lambda, digits = 3), "", ""),
+                           em2 = character(length = 6),
+                           name2 = c("SE median", "Skewness", "Kurtosis", "Visscher's stat.", "* high-quality SNPs", "   only"),
+                           stat2all = c(stat_SE, stat_skewness, stat_kurtosis, stat_Visscher, "", ""),
+                           stat2_HQ = c(stat_SE_HQ, stat_skewness_HQ, stat_kurtosis_HQ, stat_Vissc_HQ, "", ""),
+                           em3 = character(length = 6),
+                           Nname = c("Negative strand SNPs", "High-quality SNPs", "Corrected p-values", "Extreme p-values", "", ""),
+                           NN = c(strand_post$minus, SNPn_postQC_HQ, calc_p_newN, low_p_newN, NA, NA),
+                           Nperc = numeric(length = 6), stringsAsFactors = FALSE)
+  stat_table$Nperc <- round(100*stat_table$NN/SNPn_postQC, digits = 2)		
+  stat_table[5:6, c("NN", "Nperc")] <- "" 
+  if(!calculate_missing_p) { stat_table[3:4, c("NN", "Nperc")] <- "-" }
+  if(use_allele_std | use_allele_alt) {
+    stat_table$allcor <- as.character(round(c(allele_out_std$FRQ_cor, allele_out_std$FRQ_cor_ambiguous, allele_out_std$FRQ_cor_nonambi, allele_out_alt$FRQ_cor, allele_out_alt$FRQ_cor_ambiguous, allele_out_alt$FRQ_cor_nonambi), digits = 3))
+    if(!check_ambiguous_alleles) { stat_table$allcor[c(2,3,5,6)] <- "-" }
+    if(!use_allele_alt) { stat_table$allcor[c(4,5,6)] <- "-" }
   }
-
-  ### Tables of QQ filters
-  if(ignore_impstatus) { write.table(c("",
+  
+  write.table(if(SFL) {
+    rbind(c("Allele-frequency correlation", "", "", "P-value corr.", "", "", "QC stats", "all SNPs", "*HQ SNPs", "", "Other", "N", "%"), stat_table)
+  } else {
+    format(rbind(c("Allele-frequency correlation", "", "", "P-value corr.", "", "", "QC stats", "all SNPs", "*HQ SNPs", "", "Other", "N", "%"),
+                 stat_table), justify = "left") },
+              logCon, quote = FALSE, sep = if(SFL) "\t" else "   ", row.names = FALSE, col.names = FALSE)
+  rm(stat_table)
+  
+  if(ignore_impstatus) {
+    write.table(c("", "",
+                  "************************",
+                  "\t6. QQ plot filters",
+                  "************************",
+                  "",
                   "NOTE - ignore_impstatus was TRUE: HWE-p, callrate and imputation-Q filters (HQ & QQ) were applied to all SNPs",
-                  "", "",
-                  "QQ-plot filters - number of removed SNPs"), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-  } else { write.table(c("",
+                  "",
+                  ""),
+                logCon, quote = FALSE, row.names = FALSE, col.names = FALSE)
+  } else {
+    write.table(c("", "",
+                  "************************",
+                  "\t6. QQ plot filters",
+                  "************************",
+                  "",
                   "NOTE - Ignore_impstatus was FALSE: HWE-p and callrate filters (HQ & QQ) were applied to genotyped SNPs only;",
                   "       imputation-Q filter to imputed SNPs only.",
-                  "",
-                  "QQ-plot filters - number of removed SNPs"), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t") }
-  write.table(t(c("Allele frequency", "", "N", "%", "", "HWE p-value", "", "N", "%", "", "Call rate", "", "N", "%", "", "Imputation quality", "", "N", "%")), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+                  ""),
+                logCon, quote = FALSE, row.names = FALSE, col.names = FALSE) }
   
-  if(is.null(plot_output$FRQfilter_N)) {
-    FRQ_table <- data.frame(names = vector(mode = "character", length = 5), empty = vector(mode = "character", length = 5), N = vector(mode = "character", length = 5), perc = vector(mode = "character", length = 5), em = vector(mode = "character", length = 5), stringsAsFactors = FALSE)
-    FRQ_table$names[1] <- "no filter applied"
+  
+  FRQ_table <- data.frame(names = character(length = 5), N = character(5), perc = character(5), em = character(length = 5), stringsAsFactors = FALSE)
+  if(is.null(plot_output$FRQfilter_N)) { FRQ_table$names[1] <- "no filter applied"
   } else {
-    FRQ_table <- data.frame(names = vector(mode = "character", length = 5), empty = vector(mode = "character", length = 5), N = c(0L, NA, NA, NA, NA), perc = c(0, NA, NA, NA, NA), em = vector(mode = "character", length = 5), stringsAsFactors = FALSE)
     FRQ_table$names[1:length(plot_output$FRQfilter_N)] <- plot_output$FRQfilter_names
-    FRQ_table$N[1:length(plot_output$FRQfilter_N)] <- plot_output$FRQfilter_N
-    FRQ_table$perc[1:length(plot_output$FRQfilter_N)] <- round(100*plot_output$FRQfilter_N/SNPn_postQC, digits = 2)
+    FRQ_table$N[1:length(plot_output$FRQfilter_N)] <- as.character(plot_output$FRQfilter_N)
+    FRQ_table$perc[1:length(plot_output$FRQfilter_N)] <- as.character(round(100*plot_output$FRQfilter_N/SNPn_postQC, digits = 2))
   }
   
-  if(is.null(plot_output$HWEfilter_N)) {
-    HWE_table <- data.frame(names = vector(mode = "character", length = 5), empty = vector(mode = "character", length = 5), N = vector(mode = "character", length = 5), perc = vector(mode = "character", length = 5), em = vector(mode = "character", length = 5), stringsAsFactors = FALSE)
-    HWE_table$names[1] <- "no filter applied"
+  HWE_table <- data.frame(names = character(length = 5), N = character(5), perc = character(5), em = character(length = 5), stringsAsFactors = FALSE)
+  if(is.null(plot_output$HWEfilter_N)) { HWE_table$names[1] <- "no filter applied"
   } else {
-    HWE_table <- data.frame(names = vector(mode = "character", length = 5), empty = vector(mode = "character", length = 5), N = c(0L, NA, NA, NA, NA), perc = c(0, NA, NA, NA, NA), em = vector(mode = "character", length = 5), stringsAsFactors = FALSE)
     HWE_table$names[1:length(plot_output$HWEfilter_N)] <- plot_output$HWEfilter_names
-    HWE_table$N[1:length(plot_output$HWEfilter_N)] <- plot_output$HWEfilter_N
-    HWE_table$perc[1:length(plot_output$HWEfilter_N)] <- round(100*plot_output$HWEfilter_N/SNPn_postQC, digits = 2)
+    HWE_table$N[1:length(plot_output$HWEfilter_N)] <- as.character(plot_output$HWEfilter_N)
+    HWE_table$perc[1:length(plot_output$HWEfilter_N)] <- as.character(round(100*plot_output$HWEfilter_N/SNPn_postQC, digits = 2))
   }
   
-  if(is.null(plot_output$calfilter_N)) {
-    cal_table <- data.frame(names = vector(mode = "character", length = 5), empty = vector(mode = "character", length = 5), N = vector(mode = "character", length = 5), perc = vector(mode = "character", length = 5), em = vector(mode = "character", length = 5), stringsAsFactors = FALSE)
-    cal_table$names[1] <- "no filter applied"
+  cal_table <- data.frame(names = character(length = 5), N = character(5), perc = character(5), em = character(length = 5), stringsAsFactors = FALSE)
+  if(is.null(plot_output$calfilter_N)) { cal_table$names[1] <- "no filter applied"
   } else {
-    cal_table <- data.frame(names = vector(mode = "character", length = 5), empty = vector(mode = "character", length = 5), N = c(0L, NA, NA, NA, NA), perc = c(0, NA, NA, NA, NA), em = vector(mode = "character", length = 5), stringsAsFactors = FALSE)
     cal_table$names[1:length(plot_output$calfilter_N)] <- plot_output$calfilter_names
-    cal_table$N[1:length(plot_output$calfilter_N)] <- plot_output$calfilter_N
-    cal_table$perc[1:length(plot_output$calfilter_N)] <- round(100*plot_output$calfilter_N/SNPn_postQC, digits = 2)
+    cal_table$N[1:length(plot_output$calfilter_N)] <- as.character(plot_output$calfilter_N)
+    cal_table$perc[1:length(plot_output$calfilter_N)] <- as.character(round(100*plot_output$calfilter_N/SNPn_postQC, digits = 2))
   }
   
-  if(is.null(plot_output$impfilter_N)) {
-    imp_table <- data.frame(names = vector(mode = "character", length = 5), empty = vector(mode = "character", length = 5), N = vector(mode = "character", length = 5), perc = vector(mode = "character", length = 5), em = vector(mode = "character", length = 5), stringsAsFactors = FALSE)
-    imp_table$names[1] <- "no filter applied"
+  imp_table <- data.frame(names = character(length = 5), N = character(5), perc = character(5), stringsAsFactors = FALSE)
+  if(is.null(plot_output$impfilter_N)) { imp_table$names[1] <- "no filter applied"
   } else {
-    imp_table <- data.frame(names = vector(mode = "character", length = 5), empty = vector(mode = "character", length = 5), N = c(0L, NA, NA, NA, NA), perc = c(0, NA, NA, NA, NA), em = vector(mode = "character", length = 5), stringsAsFactors = FALSE)
     imp_table$names[1:length(plot_output$impfilter_N)] <- plot_output$impfilter_names
-    imp_table$N[1:length(plot_output$impfilter_N)] <- plot_output$impfilter_N
-    imp_table$perc[1:length(plot_output$impfilter_N)] <- round(100*plot_output$impfilter_N/SNPn_postQC, digits = 2)
+    imp_table$N[1:length(plot_output$impfilter_N)] <- as.character(plot_output$impfilter_N)
+    imp_table$perc[1:length(plot_output$impfilter_N)] <- as.character(round(100*plot_output$impfilter_N/SNPn_postQC, digits = 2))
   }
   
-  write.table(cbind(FRQ_table, HWE_table, cal_table, imp_table), filename_stat, na = "", append = TRUE, col.names = FALSE, row.names = FALSE, quote = FALSE, sep = "\t")
+  write.table(if(SFL) {
+    rbind(c("Allele frequency", "N", "%", "", "HWE p-value", "N", "%", "", "Call rate", "N", "%", "", "Imp. quality", "N", "%"),
+          cbind(FRQ_table, HWE_table, cal_table, imp_table))  
+  } else {
+    format(rbind(c("Allele frequency", "N", "%", "", "HWE p-value", "N", "%", "", "Call rate", "N", "%", "", "Imp. quality", "N", "%"),
+                 cbind(FRQ_table, HWE_table, cal_table, imp_table)), justify = "left") },
+              logCon, quote = FALSE, sep = if(SFL) "\t" else "   ", row.names = FALSE, col.names = FALSE)
+  rm(FRQ_table, HWE_table, cal_table, imp_table)
   
+  
+  write.table(c("", "",
+                "*********************************",
+                "\t7. Chromosome & Allele data",
+                "*********************************",
+                ""),
+              logCon, quote = FALSE, row.names = FALSE, col.names = FALSE)
   
   ### Tables counting chromosomes & alleles
   chr_table <- data.frame(Chr = c("NA", "Invalid", 1:22, "23 ( X)",
                                   "24 ( Y)", "25 (XY)", "26 ( M)"),
-                          N1 = vector(mode = "integer", length = 28),
-                          perc1= vector(mode = "numeric", length = 28),
-                          empty= vector(mode = "character", length = 28),
-                          all = vector(mode = "character", length = 28),
-                          N2 = vector(mode = "integer", length = 28),
-                          perc2= vector(mode = "numeric", length = 28),
+                          N1 = integer(length = 28),
+                          perc1= numeric(length = 28),
+                          empty= character(length = 28),
+                          all = character(length = 28),
+                          N2 = integer(length = 28),
+                          perc2= numeric(length = 28),
                           stringsAsFactors = FALSE)
   
   chr_table$N1[1] <- sum(iNA$chr)
   chr_table$N1[2] <- sum(inv$chr)
   na_rm_chr <- chr_table$N1[1] + chr_table$N1[2] > 0L
   for(ci in 1:22) { chr_table$N1[ci + 2L] <- sum(dataI$CHR == ci, na.rm = na_rm_ch) }
-  if(remove_X) {
-    chr_table$N1[25] <- NA
-    chr_table$empty[25] <- paste("Chr.  X removed (", chr_X_N, " SNPs)", sep = "")
-  } else { chr_table$N1[25] <- sum(dataI$CHR == 23L, na.rm = na_rm_ch) }
-  if(remove_Y) {
-    chr_table$N1[26] <- NA
-    chr_table$empty[26] <- paste("Chr.  Y removed (", chr_Y_N, " SNPs)", sep = "")
-  } else { chr_table$N1[26] <- sum(dataI$CHR == 24L, na.rm = na_rm_ch) }
-  if(remove_XY) {
-    chr_table$N1[27] <- NA
-    chr_table$empty[27] <- paste("Chr. XY removed (",chr_XY_N, " SNPs)", sep = "")
-  } else { chr_table$N1[27] <- sum(dataI$CHR == 25L, na.rm = na_rm_ch) }
-  if(remove_M) {
-    chr_table$N1[28] <- NA
-    chr_table$empty[28] <- paste("Chr.  M removed (", chr_M_N, " SNPs)", sep = "")
-  } else { chr_table$N1[28] <- sum(dataI$CHR == 26L, na.rm = na_rm_ch) }
+  chr_table$N1[25] <- if(remove_X ) NA else sum(dataI$CHR == 23L, na.rm = na_rm_ch)
+  chr_table$N1[26] <- if(remove_Y ) NA else sum(dataI$CHR == 24L, na.rm = na_rm_ch)
+  chr_table$N1[27] <- if(remove_XY) NA else sum(dataI$CHR == 25L, na.rm = na_rm_ch)
+  chr_table$N1[28] <- if(remove_M ) NA else sum(dataI$CHR == 26L, na.rm = na_rm_ch)
   chr_table$perc1 <- round(100*chr_table$N1/SNPn_postQC, digits = 2)
+  
+  if(remove_X) {
+    chr_table$N1[25] <- "removed"
+    chr_table$perc1[25] <- paste0("(", chr_X_N, " SNPs)") }
+  if(remove_Y) {
+    chr_table$N1[26] <- "removed"
+    chr_table$perc1[26] <- paste0("(", chr_Y_N, " SNPs)") }
+  if(remove_XY) {
+    chr_table$N1[27] <- "removed"
+    chr_table$perc1[27] <- paste0("(",chr_XY_N, " SNPs)") }
+  if(remove_M) {
+    chr_table$N1[28] <- "removed"
+    chr_table$perc1[28] <- paste0("(", chr_M_N, " SNPs)") }
   
   chr_table$all[1:10] <- c("A", "T", "C", "G", "", "Other allele", "A", "T", "C", "G")
   chr_table$N2[1] <- sum(dataI$EFFECT_ALL == "A")
   chr_table$N2[2] <- sum(dataI$EFFECT_ALL == "T")
   chr_table$N2[3] <- sum(dataI$EFFECT_ALL == "C")
   chr_table$N2[4] <- sum(dataI$EFFECT_ALL == "G")
-  chr_table$N2[c(5,6)] <- NA
   chr_table$N2[7] <- sum(dataI$OTHER_ALL == "A")
   chr_table$N2[8] <- sum(dataI$OTHER_ALL == "T")
   chr_table$N2[9] <- sum(dataI$OTHER_ALL == "C")
   chr_table$N2[10]<- sum(dataI$OTHER_ALL == "G")
   chr_table$perc2[1:10] <- round(100*chr_table$N2[1:10]/SNPn_postQC, digits = 2)
-  chr_table[11:28, c(6,7)] <- NA
+  chr_table[c(5, 6, 11:28), c(6,7)] <- ""
   
-  write.table(c("", ""), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-  write.table(t(c("Chromosome", "N", "%", "", "Effect allele", "N", "%")), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-  write.table(chr_table, filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t", na = "")
+  write.table(if(SFL) {
+    rbind(c("Chromosome", "N", "%", "", "Effect allele", "N", "%"), chr_table)
+  } else {
+    format(rbind(c("Chromosome", "N", "%", "", "Effect allele", "N", "%"), chr_table), justify = "left") },
+              logCon, quote = FALSE, sep = if(SFL) "\t" else "   ", row.names = FALSE, col.names = FALSE)
+  rm(chr_table)
   
   
-  ### Tables of errors
-  write.table(c("", "", "ERRORS in file"), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-  write.table(t(c("Pre-QC", "", "N", "%", "", "Post-QC", "", "N", "%")), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+  write.table(c("", "",
+                "*********************************",
+                "\t8. Missing & invalid values",
+                "*********************************",
+                ""),
+              logCon, quote = FALSE, row.names = FALSE, col.names = FALSE)
   
-  error_table1 <- data.frame(names = c("Duplicate SNPs", "Imputation status", "Strand", "> missing", "> invalid", "Chromosome number", "> missing", "> invalid", "Chromosome position", "> missing", "> invalid", "Invalid SNPs"),
-                             empty = vector(mode = "character", length = 12),
+  error_table1 <- data.frame(names = c("Duplicate SNPs", "Imputation status", "Strand", "> missing", "> invalid", "Chromosome", "> missing", "> invalid", "Position", "> missing", "> invalid", "Invalid SNPs"),
                              N = c(SNPn_preQC_dupli, SNPn_preQC	- (SNPn_preQC_geno+ SNPn_preQC_imp), strand_pre$missing + strand_pre$invalid, strand_pre$missing, strand_pre$invalid, iNA_chr_N + inv_chr_N, iNA_chr_N, inv_chr_N, iNA_pos_N + inv_pos_N, iNA_pos_N, inv_pos_N, SNPn_preQC_inv),
-                             perc = vector(mode = "numeric", length = 12), stringsAsFactors = FALSE)
+                             perc = numeric(length = 12), stringsAsFactors = FALSE)
   error_table1$perc <- round(100*error_table1$N / SNPn_preQC, digits = 2)
   error_table2 <- error_table1
   error_table2[1,1] <- "Extreme p-values"
   error_table2$N <- c(low_p_newN, SNPn_postQC - (SNPn_postQC_geno+ SNPn_postQC_imp), strand_post$missing + strand_post$invalid, strand_post$missing, strand_post$invalid, sum(iNA$chr | inv$chr), sum(iNA$chr), sum(inv$chr), sum(iNA$pos | inv$pos), sum(iNA$pos), sum(inv$pos), SNPn_postQC_inv)
   error_table2$perc <- round(100*error_table2$N / SNPn_postQC, digits = 2)
   
-  write.table(cbind(error_table1, vector(mode = "character", length = 12), error_table2), filename_stat, append = TRUE, col.names = FALSE, row.names = FALSE, quote = FALSE, sep = "\t")
-  write.table("Note: SNPs whose imputation status is missing (i.e. not invalid) are also counted as invalid.", filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+  write.table(if(SFL) {
+    rbind(c("Pre-QC", "N", "%", "", "Post-QC", "N", "%"),
+          cbind(error_table1, character(length = 12), error_table2))
+  } else {
+    format(rbind(c("Pre-QC", "N", "%", "", "Post-QC", "N", "%"),
+                 cbind(error_table1, character(length = 12), error_table2)),
+           justify = "left") },
+              logCon, quote = FALSE, sep = if(SFL) "\t" else "   ", row.names = FALSE, col.names = FALSE)
+  write.table("   * Note: SNPs whose imputation status is missing (i.e. not invalid) are also counted as invalid.",
+              logCon, col.names=FALSE, row.names=FALSE, quote=FALSE)
+  rm(error_table1, error_table2)
   
-  ### QC settings
   
-  write.table(c("", "", "QC settings", ""), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-  write.table(data.frame(col1 = c("input file", "output file", "dir data", "dir output", "dir refs"),
-                         col2 = c(filename_input, filename, dir_data, dir_output, dir_references),
-                         stringsAsFactors = FALSE),
-              filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+  write.table(c("", "",
+                "***************************",
+                "\t9. Settings of the QC",
+                "***************************",
+                ""),
+              logCon, quote = FALSE, row.names = FALSE, col.names = FALSE)
   
-  write.table("", filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+  settings_table <- data.frame(
+    col1 = c("input file", "output file", "dir data", "dir output", "dir refs", ""),
+    col2 = c(filename_input, filename, dir_data, dir_output, dir_references, ""),
+    stringsAsFactors = FALSE)
   
-  write.table(t(c("> filters", "", "", "", "threshold*", "NA", "HQ", "QQ")), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+  write.table(if(SFL) settings_table else format(settings_table, justify = "left"),
+              logCon, col.names=FALSE, row.names=FALSE, quote=FALSE, sep=if(SFL) "\t" else "   ")
+  rm(settings_table)
+  # Table already includes an additional row to create whiteline
   
   filter_table <- data.frame(
     chr_names = c(" X chrom.", " Y chrom.", "XY chrom.", " M chrom."),
     chr_val = c(remove_X, remove_Y, remove_XY, remove_M),
-    em1 = vector(mode ="character", length = 4),
+    em1 = "   ",
     fil_names = c("Allele FRQ", "HWE p-value", "Callrate", "Imp. Quality"),
     threshold = c(useFRQ_threshold, useHWE_threshold, useCal_threshold, useImp_threshold),
-    fNA = vector(mode = "logical", length = 4),
+    fNA = logical(length = 4),
     HQ = c(NA, NA, NA, NA),
     QQ = c("-", "-", "-", "-"),
     stringsAsFactors = FALSE)
@@ -1991,50 +2141,55 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
     if(!is.null(QQfilter_imp)) filter_table[4,8] <- paste(QQfilter_imp, collapse = ", ")
   } else { filter_table[4,8] <- "Insufficient data to meet threshold" }
   
-  write.table(filter_table, filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-  write.table(t(c("", "", "", "* the value used in phase 4 (opt. after multiplication with the remaining number of SNPs)")),
-              filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+  write.table(if(SFL) {
+    rbind(c("> filters", "", "", "", "threshold*", "NA", "HQ", "QQ"), filter_table)
+  } else {
+    format(rbind(c("> filters", "", "", "", "threshold*", "NA", "HQ", "QQ"),
+                 filter_table), justify = "left") },
+              logCon, quote = FALSE, sep = if(SFL) "\t" else "   ", row.names = FALSE, col.names = FALSE)
+  write.table(c("* the value used in phase 4 (opt. after multiplication with the remaining number of SNPs)", ""),
+              logCon, quote = FALSE, row.names = FALSE, col.names = FALSE)
+  rm(filter_table)
   
-  write.table("", filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-  write.table(t(c("> other settings", "", "", "", "", "", "", "", "> plots", "", "", "", "", "", "", "", "> allele references")), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-  write.table(data.frame(
-    col1 = c("remove_mismatches_std", "remove_mismatches_alt", "remove_diffEAF_std", "remove_diffEAF_alt", "threshold_diffEAF", "check_ambiguous_alleles", "return_HQ_effectsizes", "calculate_missing_p"),
-    col2 = c("","","","","","","",""),
-    col3 = c(remove_mismatches_std, remove_mismatches_alt, remove_diffEAF_std, remove_diffEAF_alt, as.character(threshold_diffEAF), check_ambiguous_alleles, return_HQ_effectsizes, calculate_missing_p),
-    col4 = c("","","","","","","",""),
-    col5 = c("ignore impS", "min imp", "max imp", "imputed T", "imputed F", "imputed NA","",""),
-    col6 = c("","","","","","","",""),
-    col7 = c(ignore_impstatus,  as.character(minimal_impQ_value), as.character(maximal_impQ_value), paste(imputed_T, collapse = ", "), paste(imputed_F, collapse = ", "), paste(imputed_NA, collapse = ", "),"",""),
-    col8 = c("","",""," "," "," ","",""),
-    col9 = c("make plots", "only plot if threshold", "histograms", "QQ plot", "Manhattan", "","",""),
-    col10= c("","","","","","","",""),
-    col11= c(make_plots, only_plot_if_threshold, plot_histograms, plot_QQ, plot_Manhattan, "","",""),
-    col12= c("","","","","","","",""),
-    col13= c("threshold FRQ test" , "threshold p-test", "QQ bands", "plot p cutoff", "*Manhattan threshold", "","",""),
-    col14= c("","","","","","","",""),
-    col15= c(threshold_allele_freq_correlation, threshold_p_correlation, as.character(plot_QQ_bands), plot_cutoff_p, useMan_threshold, "","",""),
-    col16= c("","","","","","","",""),
-    col17= c("update alt", "update savename", "save as rdata", "backup alt", "", "","",""),
-    col10= c(""," ","","","","","",""),
-    col18= if(update_alt) { c(TRUE, update_savename, update_as_rdata, backup_alt, "", "","","")
-    } else { c(FALSE, "-", "-", "-", "", "", "", "" ) },
-    col19= c("","","","","","","",""),
-    col20= c("allele ref std input", "allele ref std name", "allele ref alt input", "allele ref alt name", "", "","",""),
-    col21= c("","","","","","","",""),
-    col22= c(settings_allele_std, allele_name_std, settings_allele_alt, allele_name_alt, "", "","",""),
-    stringsAsFactors = FALSE), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
+  settings_table <- rbind(c("> other settings", "", "", "", "", "", "> plots", "", "", "", "", "", "> allele references", "", "", "", ""),
+                          data.frame(
+                            c1 = c("remove_mismatches_std", "remove_mismatches_alt", "remove_diffEAF_std", "remove_diffEAF_alt", "threshold_diffEAF", "check_ambiguous_alleles", "return_HQ_effectsizes", "calculate_missing_p"),
+                            c2 = c(remove_mismatches_std, remove_mismatches_alt, remove_diffEAF_std, remove_diffEAF_alt, as.character(threshold_diffEAF), check_ambiguous_alleles, return_HQ_effectsizes, calculate_missing_p),
+                            c3 = "   ",
+                            c4 = c("ignore impS", "min imp", "max imp", "imputed T", "imputed F", "imputed NA","",""),
+                            c5 = c(ignore_impstatus,  as.character(minimal_impQ_value), as.character(maximal_impQ_value), paste(imputed_T, collapse = ", "), paste(imputed_F, collapse = ", "), paste(imputed_NA, collapse = ", "),"",""),
+                            c6 = "   ",
+                            c7 = c("make plots", "only plot if threshold", "histograms", "QQ plot", "Manhattan", "intensity","",""),
+                            c8 = c(make_plots, only_plot_if_threshold, plot_histograms, plot_QQ, plot_Manhattan, plot_intensity,"",""),
+                            c9 = "   ",
+                            c10= c("threshold FRQ test" , "threshold p-test", "QQ bands", "plot p cutoff", "*Manhattan threshold", "","",""),
+                            c11= c(threshold_allele_freq_correlation, threshold_p_correlation, as.character(plot_QQ_bands), plot_cutoff_p, useMan_threshold, "","",""),
+                            c12= "   ",
+                            c13= c("update alt", "update savename", "save as rdata", "backup alt", "", "","",""),
+                            c14= if(update_alt) { c(TRUE, update_savename, update_as_rdata, backup_alt, "", "","","")
+                            } else { c(FALSE, "-", "-", "-", "", "", "", "" ) },
+                            c15= "   ",
+                            c16= c("allele ref std input", "allele ref std name", "allele ref alt input", "allele ref alt name", "", "","",""),
+                            c17= c(settings_allele_std, allele_name_std, settings_allele_alt, allele_name_alt, "", "","",""),
+                            stringsAsFactors = FALSE))
+  write.table(if(SFL) settings_table else format(settings_table, justify = "left"),
+              logCon, quote = FALSE, sep = if(SFL) "\t" else "   ", row.names = FALSE, col.names = FALSE)
   
-  write.table(c("", "> data import & export"), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-  write.table(data.frame(
+  write.table(c("", "> data import & export"),
+              logCon, quote = FALSE, row.names = FALSE, col.names = FALSE)
+  
+  settings_table <- data.frame(
     col1 = c("nrows", "test_nrows", "header_translations", "comment.char", "column_separators", "selected separator", "na.strings", "header", "", "", ""),
-    col2 = vector(mode = "character", length = 11),
-    col3 = c(nrows, nrows_test, settings_header_input, encodeString(paste("'", comment.char, "'", sep = "")), encodeString(paste("'", column_separators, "'", sep = "", collapse = ", ")), encodeString(paste("'", loadI$sep, "'", sep = "")), paste(na.strings, collapse = ", "), header, "", "", ""),
-    col4 = vector(mode = "character", length = 11),
+    col3 = c(nrows, nrows_test, settings_header_input, encodeString(paste0("'", comment.char, "'")), encodeString(paste0("'", column_separators, "'", collapse = ", ")), encodeString(paste0("'", loadI$sep, "'")), paste(na.strings, collapse = ", "), header, "", "", ""),
+    col4 = "   ",
     col5 = c("save_final_dataset", "order_columns", "out_header", "out_quote", "out_sep", "out_eol", "out_na", "out_colnames", "out_rownames", "out_dec", "out_qmethod"),
-    col6 = vector(mode = "character", length = 11),
-    col7 = c(save_final_dataset, order_columns, settings_header_output, out_quote, encodeString(paste("'", out_sep, "'", sep = "")), encodeString(paste("'", out_eol, "'", sep = "")), out_na, paste(out_colnames, collapse = ", "), paste(out_rownames, collapse = ", "), out_dec, out_qmethod),
-    stringsAsFactors = FALSE), filename_stat, append=TRUE, col.names=FALSE, row.names=FALSE, quote=FALSE, sep="\t")
-    
+    col7 = c(save_final_dataset, order_columns, settings_header_output, out_quote, encodeString(paste0("'", out_sep, "'")), encodeString(paste0("'", out_eol, "'")), out_na, paste(out_colnames, collapse = ", "), paste(out_rownames, collapse = ", "), out_dec, out_qmethod),
+    stringsAsFactors = FALSE)
+  write.table(if(SFL) settings_table else format(settings_table, justify = "left"),
+              logCon, quote = FALSE, sep = if(SFL) "\t" else "   ", row.names = FALSE, col.names = FALSE)
+  close(logCon)
+  rm(settings_table)
+  
 
   # creating output file
   
@@ -2061,7 +2216,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
   
   QC_results <- list(QC_successful = TRUE,
                      filename_input = filename_input,
-                     filename_output = paste(filename, ".txt", sep = ""),
+                     filename_output = paste0(filename, ".txt"),
                      
                      sample_size		= stat_N_max,
                      sample_size_HQ = stat_N_HQ,
@@ -2157,23 +2312,23 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
                      all_ref_std_name	= allele_name_std,
                      all_ref_alt_name	= allele_name_alt,
                      
-                     all_MAF_std_r = if(use_allele_std)		{ allele_out_std$FRQ_cor } else { NA },
-                     all_MAF_alt_r = if(use_allele_alt)		{ allele_out_alt$FRQ_cor } else { NA },
-                     all_ambiguous_MAF_std_r = if(use_allele_std)	{ allele_out_std$FRQ_cor_ambiguous } else { NA },
-                     all_ambiguous_MAF_alt_r = if(use_allele_alt)	{ allele_out_alt$FRQ_cor_ambiguous } else { NA },
-                     all_non_ambig_MAF_std_r = if(use_allele_std)		{ allele_out_std$FRQ_cor_nonambi } else { NA },
-                     all_non_ambig_MAF_alt_r = if(use_allele_alt)		{ allele_out_alt$FRQ_cor_nonambi } else { NA },
+                     all_MAF_std_r = if(use_allele_std) allele_out_std$FRQ_cor else NA,
+                     all_MAF_alt_r = if(use_allele_alt) allele_out_alt$FRQ_cor else NA,
+                     all_ambiguous_MAF_std_r = if(use_allele_std)	allele_out_std$FRQ_cor_ambiguous else NA,
+                     all_ambiguous_MAF_alt_r = if(use_allele_alt)	allele_out_alt$FRQ_cor_ambiguous else NA,
+                     all_non_ambig_MAF_std_r = if(use_allele_std) allele_out_std$FRQ_cor_nonambi else NA,
+                     all_non_ambig_MAF_alt_r = if(use_allele_alt) allele_out_alt$FRQ_cor_nonambi else NA,
                      all_ref_changed = allele_ref_changed,
                      
                      effectsize_return = outcome_ES$return_ES,
-                     effectsizes_HQ	= if(outcome_ES$return_ES) { outcome_ES$HQ_effectsizes } else { NULL },
+                     effectsizes_HQ	= if(outcome_ES$return_ES) outcome_ES$HQ_effectsizes else NULL,
                      pvalue_r		= outcome_P,
                      visschers_stat	= stat_Visscher,
                      visschers_stat_HQ = stat_Vissc_HQ,
                      
-                     columns_std_missing	= if(header_info$missing_N == 0L) { 0L } else { paste(header_info$missing_h, collapse = ", ") },
-                     columns_std_empty		= if(length(empty_colls) == 0L) { 0L } else { paste(empty_colls, collapse = ", ") },
-                     columns_unidentified	= if(header_info$unknown_N == 0L) { 0L } else { paste(header_info$unknown_h, collapse = ", ") },
+                     columns_std_missing	= if(header_info$missing_N == 0L) 0L else paste(header_info$missing_h, collapse = ", "),
+                     columns_std_empty		= if(length(empty_colls) == 0L)   0L else paste(empty_colls, collapse = ", "),
+                     columns_unidentified	= if(header_info$unknown_N == 0L) 0L else paste(header_info$unknown_h, collapse = ", "),
                      
                      outcome_useFRQ	= useFRQ,
                      outcome_useHWE	= useHWE,
@@ -2204,7 +2359,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
       if(settings_header_output == "original") {
         if(order_columns) {
           header_new <- colnames(dataI)
-          order_orig <- vector(mode = "integer", length = header_info$header_N)
+          order_orig <- integer(length = header_info$header_N)
           for(hI in 1:header_info$header_N) { order_orig[hI] <- which(header_new == header_info$header_h[hI]) }
           colnames(dataI)[order_orig] <- header_orig
         } else {
@@ -2212,7 +2367,7 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
         }
       } else {
         header_out <- translate_header(header = colnames(dataI), standard = out_header[ ,1], alternative = out_header)
-        if(header_out$missing_N > 0L) { save_log(5, "saving file", "missing column", SNPn_postQC, SNPn_postQC, "-", paste("Unable to translate column(s)", paste(header_out$missing_h, collapse = ", ")), filename_dir) }
+        if(header_out$missing_N > 0L) save_log(5, "saving file", "missing column", SNPn_postQC, SNPn_postQC, "-", paste("Unable to translate column(s)", paste(header_out$missing_h, collapse = ", ")), filename_dir)
         colnames(dataI) <- header_out$header_h
         
         if(settings_header_output == "GenABEL") {
@@ -2234,7 +2389,9 @@ function(filename, filename_output = paste("QC_", filename, sep = ""),
         }
       }
     }
-    write.table(dataI, paste(filename_dir, ".txt", sep = ""),
+    
+    write.table(dataI,
+                if(gzip_final_dataset) gzfile(paste0(filename_dir, ".txt.gz")) else paste0(filename_dir, ".txt"),
                 quote = out_quote, sep = out_sep, eol = out_eol, na = out_na, dec = out_dec,
                 row.names = out_rownames, col.names = out_colnames, qmethod = out_qmethod)
   }

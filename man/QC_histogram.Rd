@@ -27,7 +27,7 @@ QC_histogram(dataset, data_col = 1,
              F_strings = c("0", "FALSE", "no", "NO", "n", "N"),
              NA_strings = c(NA, "NA", ".", "-"), ...)
 histogram_series(dataset, data_col = 1,
-   save_name = paste("dataset_F", 1:nrow(plot_table), sep = ""),
+   save_name = paste0("dataset_F", 1:nrow(plot_table)),
    save_dir = getwd(), export_outliers = FALSE,
    filter_FRQ = NULL, filter_cal = NULL,
    filter_HWE = NULL, filter_imp = NULL,

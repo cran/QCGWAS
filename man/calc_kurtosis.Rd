@@ -18,13 +18,24 @@ calc_skewness(input,
     passed to \code{\link{HQ_filter}}.}
 }
 \details{
-Kurtosis is calculated as:
-    
-\code{sum( (ES - mean(ES))^4) / ((length(ES)-1) * sd(ES)^4 )}
+  Kurtosis is a measure of how well a distribution matches a
+  Gaussian distribution. A Gaussian distribution has a kurtosis
+  of \code{0}. Negative kurtosis indicates a flatter
+  distribution curve, while positive kurtosis indicates a
+  sharper, thinner curve.
   
-Skewness is calculated as:
+  Skewness is a measure of distribution asymmetry. A symmetrical
+  distribution has skewness \code{0}. A positive skewness
+  indicates a long tail towards higher values, while a negative
+  skewness indicates a long tail towards lower values.
   
-\code{sum( (ES - mean(ES))^3) / ((length(ES)-1) * sd(ES)^3 )}
+  Kurtosis is calculated as:
+  
+  \code{sum( (ES - mean(ES))^4) / ((length(ES)-1) * sd(ES)^4 )}
+  
+  Skewness is calculated as:
+  
+  \code{sum( (ES - mean(ES))^3) / ((length(ES)-1) * sd(ES)^3 )}
 }
 \value{
   Respectively the kurtosis and skewness of the input

@@ -11,7 +11,7 @@ function(dataset, chr, start_pos, end_pos,
     dataset <- dataset[which(dataset$PVALUE <= plot_cutoff_p & dataset$CHR == chr & dataset$POSITION >= start_pos & dataset$POSITION <= end_pos), header_std[-2]]
   } else {
     header_data <- toupper(colnames(dataset))
-    header_col <- vector(mode = "integer", length = length(header_std))
+    header_col <- integer(length = length(header_std))
     for(forI in 1:length(header_std)) {
       header_current <- identify_column(header_std[forI], header_translations, header_data)
       if(length(header_current) != 1L) { if(length(header_current) == 0L) { stop(paste("Cannot identify data column:", header_std[forI])) } else { stop(paste("Multiple data columns identified as:", header_std[forI])) } }
@@ -23,7 +23,7 @@ function(dataset, chr, start_pos, end_pos,
   
   if(nrow(dataset) < 10L) stop("Insufficient usuable entries")
   
-  jpeg(paste(save_dir, "/", save_name, ".jpg", sep = ""),
+  png(paste0(save_dir, "/", save_name, ".png"),
        width = 960, height = 480)
   par(mgp = c(2.5, 0.9, 0))
   plot(dataset$POSITION, -log10(dataset$PVALUE), pch = 20, xaxs = "r",

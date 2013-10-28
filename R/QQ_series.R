@@ -55,7 +55,7 @@ function(dataset, save_name = "dataset", save_dir = getwd(),
                            HWE = if(useHWE) filter_HWE else NA, imp = if(useImp) filter_imp else NA,
                            NA_FRQ = filter_NA_FRQ, NA_cal = filter_NA_cal, NA_HWE = filter_NA_HWE, NA_imp = filter_NA_imp,
                            stringsAsFactors = FALSE)
-  plot_table$name <- if(length(save_name) < nrow(plot_table)) paste(save_name, 1:nrow(plot_table), sep = "") else save_name
+  plot_table$name <- if(length(save_name) < nrow(plot_table)) paste0(save_name, 1:nrow(plot_table)) else save_name
   
   
   for(ij in 1:nrow(plot_table)) {

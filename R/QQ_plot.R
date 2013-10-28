@@ -137,7 +137,7 @@ function(
     P_exp <- P_exp[i1000]
   }
   
-  jpeg(paste(save_dir, "/", save_name, ".jpg", sep = ""), width = 720, height = 720)
+  png(paste0(save_dir, "/", save_name, ".png"), width = 720, height = 720)
   plot(c(P_exp_min, P_exp_max), c(P_obs_min, P_obs_max), xlim = c(0, P_exp_max), ylim = c(0, P_obs_max),
        main = "QQ plot", xlab = "Expected -log10(p-value)", ylab = "Observed -log10(p-value)",
        pch = 20, sub = clarf, font.sub = 3, ...)

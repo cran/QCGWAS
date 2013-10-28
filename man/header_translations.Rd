@@ -7,12 +7,8 @@
 \description{
   This is a sample translation table, as used by
   \code{\link{translate_header}} to translate dataset column
-  names to the \code{QCGWAS} standard.
-  
-  Note: It not recommended to load this table into
-  R with the \code{\link{data}} function, as this automatically
-  converts the characters strings into factors. See
-  \code{\link{translate_header}} for more information.
+  names to the \code{QCGWAS} standard. An editable .txt version
+  can be found in "R\\library\\QCGWAS\\doc".
 }
 \usage{data(header_translations)}
 \format{

@@ -11,8 +11,8 @@
 \tabular{ll}{
 Package: \tab QCGWAS\cr
 Type: \tab Package\cr
-Version: \tab 1.0-6\cr
-Date: \tab 2013-08-19\cr
+Version: \tab 1.0-7\cr
+Date: \tab 2013-10-28\cr
 License: \tab GPL (>= 3)\cr
 }
   The core of the package is the function \code{\link{QC_GWAS}}.
@@ -38,7 +38,7 @@ Peter J. van der Most and Ilja M. Nolte
 Maintainer: Peter J. van der Most <p.j.van.der.most@umcg.nl>
 }
 \references{
-  Van der Most, P.J., Vaez, A., Prins, B., Loretto Munoz, M.,
+  Van der Most, P.J., Vaez, A., Prins, B.P., Loretto Munoz, M.,
   Snieder, H., Alizadeh, B.Z. & Nolte, I.M. (In preparation).
   QCGWAS: A flexible R package for automated quality control of
   Genome-Wide Association results.

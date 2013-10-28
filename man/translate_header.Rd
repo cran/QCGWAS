@@ -36,14 +36,10 @@ translate_header(header,
   and the right column of \code{alternative} should be uppercase
   as well.
   
-  A sample translation table can be found in
-  "R\\library\\QCGWAS\\doc". (It not recommended to load it into
-  R with the \code{\link{data}} function, as this automatically
-  converts the characters into factors. Use
-  \code{\link{read.table}} instead, or put it in the reference
-  directory and pass the filename to \code{\link{QC_GWAS}} by
-  the \code{header_translations} argument. \code{QC_GWAS} will
-  then load the table automatically.)
+  A sample translation table is provided in the package data
+  folder. It can be loaded via \code{data("header_translations")}.
+  An editable .txt version can be found in the
+  "R\\library\\QCGWAS\\doc" folder.
 }
 \value{
   \code{translate_header} returns an object of class 'list' with 6 components:
@@ -58,7 +54,12 @@ translate_header(header,
   \item{header_N, missing_N, unknown_N}{integer; the lengths of
     the above three vectors}
 }
-\seealso{\code{\link{identify_column}}}
+\seealso{
+  \code{\link{header_translations}} for a sample translation
+  table.
+  
+  \code{\link{identify_column}}
+}
 \examples{
   sample_data <-
     data.frame(SNP = paste("rs", 1:10, sep = ""),

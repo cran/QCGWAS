@@ -31,7 +31,12 @@ plot_precision(SE, N,
   When running a QC over multiple files, \code{\link{QC_series}}
   collects the values of the \code{SE_HQ_median} and \code{sample_size_HQ}
   outputs of \code{\link{QC_GWAS}} in a table, which is then
-  passed to this function to convert it into a plot.
+  passed to this function to convert it to a plot.
+  
+  The plot is to provide a visual estimate whether the standard
+  errors are within the expected range. As sample size increases,
+  the median standard error is expected to decrease, so the plot
+  should show a linear relation.
 }
 \value{An invisible \code{NULL}.}
 \seealso{

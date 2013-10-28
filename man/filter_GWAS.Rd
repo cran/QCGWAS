@@ -9,6 +9,7 @@
 \usage{
 filter_GWAS(ini_file,
             GWAS_files, output_names,
+            gzip_output = TRUE,
             dir_GWAS = getwd(), dir_output = dir_GWAS,
             FRQ_HQ = NULL, HWE_HQ = NULL,
             cal_HQ = NULL, imp_HQ = NULL,
@@ -40,7 +41,11 @@ filter_GWAS(ini_file,
   \item{output_names}{character vector: the filenames for the
     output files. The default option is to use the input
     filenames. Note that, unlike with other \code{QCGWAS}
-    functions, the file extensions should be included.}
+    functions, the file extensions should be included (However,
+    the function will automatically add \code{".gz"} when the
+    files are compressed.}
+  \item{gzip_output}{logical; should the output files be
+    compressed?}    
   \item{dir_GWAS, dir_output}{character-strings specifying the
     directory address of the folders for the input files and the
     output, respectively. Note that R uses \emph{forward} slash

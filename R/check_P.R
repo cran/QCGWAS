@@ -12,11 +12,11 @@ function(dataset, HQ_subset,
   }
   
   if(missing(HQ_subset)) {
-    HQ_subset <- vector(mode = "logical", length = nrow(dataset))
+    HQ_subset <- logical(length = nrow(dataset))
     plot_HQ <- FALSE
   } else {
     if(is.numeric(HQ_subset)) {
-      temp <- vector(mode = "logical", length = nrow(dataset))
+      temp <- logical(length = nrow(dataset))
       temp[HQ_subset] <- TRUE
       HQ_subset <- temp
     }
@@ -45,16 +45,18 @@ function(dataset, HQ_subset,
       return(NA)      
     }
     if(p_cor < threshold_r) {
-      if(use_log) save_log(phaseL = 4L, checkL = "p-value check", typeL = "poor correlation", SNPL = dataN, allSNPs = dataN, actionL = "-", noteL = paste("Reported p-values correlate poorly with recalculated p-values ( r <",threshold_r,")"), fileL = paste(save_dir, save_name, sep = "/"))
-      print(paste(" - - warning: reported p-values correlate poorly to expected values(r = ", p_cor, ")", sep = ""), quote = FALSE)
+      if(use_log) save_log(phaseL = 4L, checkL = "p-value check", typeL = "poor correlation", SNPL = dataN, allSNPs = dataN, actionL = "-", noteL = paste("Reported p-values correlate poorly with recalculated p-values ( r =", round(p_cor, digits = 3),")"), fileL = paste(save_dir, save_name, sep = "/"))
+      print(paste0(" - - warning: reported p-values correlate poorly to expected values(r = ", round(p_cor, digits = 3), ")"), quote = FALSE)
     }
     if(plot_correlation & (p_cor < threshold_r | !plot_if_threshold )) {
       p_max <- max(p_obs, p_exp)
-      jpeg(paste(save_dir, "/", save_name, "_graph_p-correlation.jpg", sep = ""),
+      png(paste0(save_dir, "/", save_name, "_graph_p-correlation.png"),
            width = 720, height = 720, res = 144)
-      plot(0, 0, xlim = c(0, p_max), ylim = c(0, p_max), col = "white", 
+      plot(x = 0, y = 0, col = "white",
+           xlim = c(0, p_max), ylim = c(0, p_max),
            main="P-value correlation", xlab = "Expected -log10(p)", ylab = "Observed -log10(p)",
            sub = save_name, cex.sub = 1.3, ...)
+      lines(x = c(0, 1.1 * p_max), y = c(0, 1.1 * p_max))
       points(p_exp[!HQ_subset],p_obs[!HQ_subset], col = if(plot_HQ) "grey" else "black", pch = 20, cex = 0.8)      
       points(p_exp[HQ_subset], p_obs[HQ_subset], col = "black", pch = 20, cex = 0.8)
       if (plot_HQ) legend(0.1 * p_max, 0.9 * p_max, c(" Low quality", "High quality"), pch = 20, col = c("grey", "black"), cex = 0.8)

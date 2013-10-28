@@ -28,7 +28,7 @@
 }
 \usage{
 QC_GWAS(filename,
-        filename_output = paste("QC_", filename, sep = ""),
+        filename_output = paste0("QC_", filename),
         dir_data = getwd(),
         dir_output = paste(dir_data, "QCGWASed", sep = "/"),
         dir_references = dir_data,
@@ -40,7 +40,9 @@ QC_GWAS(filename,
         imputed_T = c("1", "TRUE", "T"),
         imputed_F = c("0", "FALSE", "F"),
         imputed_NA = c(NA, "-"),
-        save_final_dataset = TRUE, order_columns = FALSE,
+        save_final_dataset = TRUE,
+        gzip_final_dataset = TRUE, order_columns = FALSE,
+        spreadsheet_friendly_log = FALSE,
         out_header = "standard",
         out_quote = FALSE, out_sep = "\t", out_eol = "\n",
         out_na = "NA", out_dec = ".", out_qmethod = "escape",
@@ -52,6 +54,7 @@ QC_GWAS(filename,
         make_plots = TRUE, only_plot_if_threshold = TRUE,
         threshold_allele_freq_correlation = 0.95,
         threshold_p_correlation = 0.99,
+        plot_intensity = FALSE,
         plot_histograms = make_plots, plot_QQ = make_plots,
         plot_QQ_bands = TRUE, plot_Manhattan = make_plots,
         plot_cutoff_p = 0.05,
@@ -59,23 +62,25 @@ QC_GWAS(filename,
         allele_ref_alt, allele_name_alt,
         update_alt = FALSE, update_savename,
         update_as_rdata = FALSE, backup_alt = FALSE,
-        remove_mismatches = FALSE,
+        remove_mismatches = TRUE,
         remove_mismatches_std = remove_mismatches,
         remove_mismatches_alt = remove_mismatches,
         threshold_diffEAF = 0.15, remove_diffEAF = FALSE,
         remove_diffEAF_std = remove_diffEAF,
         remove_diffEAF_alt = remove_diffEAF,
-        check_ambiguous_alleles = TRUE,
+        check_ambiguous_alleles = FALSE,
         use_threshold = 0.1,
         useFRQ_threshold = use_threshold,
         useHWE_threshold = use_threshold,
         useCal_threshold = use_threshold,
         useImp_threshold = use_threshold,
         useMan_threshold = use_threshold,
-        HQfilter_FRQ = NULL, HQfilter_HWE = NULL,
-        HQfilter_cal = NULL, HQfilter_imp = NULL,
-        QQfilter_FRQ = NULL, QQfilter_HWE = NULL,
-        QQfilter_cal = NULL, QQfilter_imp = NULL,
+        HQfilter_FRQ = 0.01, HQfilter_HWE = 10^-6,
+        HQfilter_cal = 0.95, HQfilter_imp = 0.3,
+        QQfilter_FRQ = c(NA, 0.01, 0.05),
+        QQfilter_HWE = c(NA, 10^-6, 10^-4),
+        QQfilter_cal = c(NA, 0.95, 0.99),
+        QQfilter_imp = c(NA, 0.3, 0.5, 0.8),
         NAfilter = TRUE,
         NAfilter_FRQ = NAfilter, NAfilter_HWE = NAfilter,
         NAfilter_cal = NAfilter, NAfilter_imp = NAfilter,
@@ -150,8 +155,14 @@ QC_series(data_files, datafile_tag, output_filenames,
     and the character string \code{"NA"}.}
   \item{save_final_dataset}{logical; should the post-QC dataset
     be saved?}
+  \item{gzip_final_dataset}{logical; should the post-QC dataset
+    be compressed?}
   \item{order_columns}{logical; should the post-QC dataset use
     the default column order?}
+  \item{spreadsheet_friendly_log}{logical; if \code{TRUE}, the
+    final log file will be tab-separated, for easy viewing in a
+    spreadsheet program. If \code{FALSE} (default), it will be
+    formatted for pretty viewing in a text-processing program.}
   \item{out_header}{Translation table for the column names of
     the \emph{output} file. This argument is the opposite of
     \code{header_translations}: it translates the standard
@@ -191,6 +202,10 @@ QC_series(data_files, datafile_tag, output_filenames,
     the correlation between respectively
     the allele frequency of the dataset and the reference, and
     the calculated and reported p-values.}
+  \item{plot_intensity}{logical; if \code{TRUE}, instead of a
+    scatterplot of allele correlations, an intensity plot is
+    generated. This option is currently only partially
+    implemented. Leave to \code{FALSE} for now.}
   \item{plot_histograms}{logical; should histograms of the effect
     sizes, standard errors, allele frequencies, HWE p-values,
     callrates and imputation quality be made?}
@@ -682,9 +697,9 @@ QC_series(data_files, datafile_tag, output_filenames,
 }
 \section{QC output files}{
   The results of the QC are reported in a variety of .txt and
-  .jpeg files saved in \code{dir_output}. The files use the same
+  .png files saved in \code{dir_output}. The files use the same
   output name as the dataset, with an extension to indicate
-  their contents (i.e. '_log.txt', '_graph_QQ.jpg'). The .txt
+  their contents (i.e. '_log.txt', '_graph_QQ.png'). The .txt
   files are tab-delimited and are best viewed in a spreadsheet
   program. The most important one is the log file. This file
   summarizes the results of the QC and the data inside the file.
@@ -790,7 +805,12 @@ QC_series(data_files, datafile_tag, output_filenames,
   The fifth table reports the QC outcome statistics. The p-value
   and allele-frequency correlations should be close to \code{1}.
   An allele-frequency correlation of \code{-1} means that the
-  frequency was reported for the wrong (non-effect) allele.
+  frequency was reported for the wrong (non-effect) allele. As
+  for the p-value correlaction: in a
+  typical GWAS dataset, the expected and observed p-values
+  should correlate perfectly. If this isn't the case, it means
+  either that a column was misidentified when loading the dataset
+  or that the wrong values were used when generating the data.
   
   The sixth table reports how many SNPs were removed by the
   various QQ plot filters.

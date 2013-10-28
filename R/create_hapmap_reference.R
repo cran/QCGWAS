@@ -25,11 +25,11 @@ function(dir = getwd(),
       }
       if(di != 1L) print(paste(" - downloading chromosome:", dn), quote = FALSE)
       flush.console()
-      download.file(url = paste("http://hapmap.ncbi.nlm.nih.gov/downloads/frequencies/2010-08_phaseII+III/",
-                                "allele_freqs_chr", dn, "_", download_subset, "_r28_nr.b36_fwd.txt.gz", sep = ""),
-                    destfile = paste(dir, "/allele_freqs_chr", dn, "_", download_subset, "_r28_nr.b36_fwd.txt.gz", sep = ""))
+      download.file(url = paste0("http://hapmap.ncbi.nlm.nih.gov/downloads/frequencies/2010-08_phaseII+III/",
+                                 "allele_freqs_chr", dn, "_", download_subset, "_r28_nr.b36_fwd.txt.gz"),
+                    destfile = paste0(dir, "/allele_freqs_chr", dn, "_", download_subset, "_r28_nr.b36_fwd.txt.gz"))
     }
-    hapmap_files <- paste("allele_freqs_chr", c(1:22, "X", "Y", "M"), "_", download_subset, "_r28_nr.b36_fwd.txt.gz", sep = "")
+    hapmap_files <- paste0("allele_freqs_chr", c(1:22, "X", "Y", "M"), "_", download_subset, "_r28_nr.b36_fwd.txt.gz")
     print("", quote = FALSE)
     print("Processing files", quote = FALSE)
   } else {
@@ -61,7 +61,7 @@ function(dir = getwd(),
       chrmap$otherallele_freq[flip] <- tempfrq
     }
     
-    print(paste("Finished chr ", chr, " (", fi, " out of ", fileN, ")  - SNPs: ", nrow(chrmap), " - flipped: ", length(flip), sep = ""), quote = FALSE)
+    print(paste0("Finished chr ", chr, " (", fi, " out of ", fileN, ")  - SNPs: ", nrow(chrmap), " - flipped: ", length(flip)), quote = FALSE)
     flush.console()
     allele_ref_std <- if(fi == 1L) chrmap else rbind(allele_ref_std, chrmap)
   }
@@ -73,19 +73,19 @@ function(dir = getwd(),
     dupli_names <- unique(allele_ref_std$SNP[duplicated(allele_ref_std$SNP)])
     duplis <- which(allele_ref_std$SNP %in% dupli_names)
     print("WARNING: duplicate SNPids encountered in reference dataset - SNPs removed", quote = FALSE)
-    write.table(allele_ref_std[duplis, ], paste(dir, "/", filename, "_removed_duplicates.txt", sep = ""), col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+    write.table(allele_ref_std[duplis, ], paste0(dir, "/", filename, "_removed_duplicates.txt"), col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
   } else { duplis <- NULL }
   
   monomorph <- which(!allele_ref_std$MINOR %in% c("A", "T", "C", "G") | !allele_ref_std$MAJOR %in% c("A", "T", "C", "G"))
   if(length(monomorph) > 0L) {
     print("WARNING: invalid / missing alleles encountered in reference dataset - SNPs removed", quote = FALSE)
-    write.table(allele_ref_std[monomorph,], paste(dir, "/", filename, "_removed_bad_alleles.txt", sep = ""), col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+    write.table(allele_ref_std[monomorph,], paste0(dir, "/", filename, "_removed_bad_alleles.txt"), col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
   }
   
   bad_freq <- which(allele_ref_std$MAF + allele_ref_std$other_AF != 1)
   if(length(bad_freq ) > 0L) {
     print("WARNING: allele frequencies do not add up - SNPs removed", quote = FALSE)
-    write.table(allele_ref_std[bad_freq,], paste(dir, "/", filename, "_bad_frequency.txt", sep = ""), col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+    write.table(allele_ref_std[bad_freq,], paste0(dir, "/", filename, "_bad_frequency.txt"), col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
   }
   
   remove_list <- unique(c(duplis, monomorph, bad_freq))
@@ -107,12 +107,12 @@ function(dir = getwd(),
    print("   See: http://hapmap.ncbi.nlm.nih.gov/datareleasepolicy.html", quote = FALSE)
   }
   
-  if(save_txt) write.table(allele_ref_std, paste(dir, "/", filename, ".txt", sep = ""), col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
+  if(save_txt) write.table(allele_ref_std, paste0(dir, "/", filename, ".txt"), col.names=TRUE, row.names=FALSE, quote=FALSE, sep="\t")
   
   if(save_rdata | return_reference) {
     allele_ref_std$MINOR <- as.factor(allele_ref_std$MINOR)
     allele_ref_std$MAJOR <- as.factor(allele_ref_std$MAJOR)
-    if(save_rdata) save(allele_ref_std, file = paste(dir, "/", filename, ".RData", sep = ""))
+    if(save_rdata) save(allele_ref_std, file = paste0(dir, "/", filename, ".RData"))
     if(return_reference) return(allele_ref_std)
   }
   

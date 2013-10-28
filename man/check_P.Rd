@@ -24,7 +24,7 @@ check_P(dataset, HQ_subset,
     quality SNPs.}
   \item{plot_correlation}{logical; should a scatterplot of
     the reported vs. calculated p-values be made? If \code{TRUE},
-    the plot is saved as a .jpg file.}
+    the plot is saved as a .png file.}
   \item{plot_if_threshold}{logical; if \code{TRUE}, the
     scatterplot is only saved when the correlation between
     reported and calculated p-values is lower than
@@ -48,6 +48,11 @@ check_P(dataset, HQ_subset,
   \code{check_P} calculates the expected p-value by taking the
   chi-square (1 degree of freedom) of the effect size divided by
   the standard error squared.
+  
+  In a typical GWAS dataset, the expected and observed p-values
+  should correlate perfectly. If this isn't the case, the
+  problem either lies in a misidentified column, or the wrong
+  values were used when generating the dataset.
 }
 \value{
   The correlation between expected and reported p-values.

@@ -15,8 +15,9 @@ match_alleles(dataset, ref_set, HQ_subset,
               check_strand = FALSE,
               save_mismatches = TRUE, delete_mismatches = FALSE,
               delete_diffEAF = FALSE, threshold_diffEAF = 0.15,
-              check_FRQ = TRUE, check_ambiguous = TRUE,
-              plot_FRQ = FALSE, plot_if_threshold = FALSE,
+              check_FRQ = TRUE, check_ambiguous = FALSE,
+              plot_FRQ = FALSE, plot_intensity = FALSE, 
+              plot_if_threshold = FALSE,
               threshold_r = 0.95,
               return_SNPs = FALSE, return_ref_values = FALSE,
               header_translations, header_reference,
@@ -41,7 +42,8 @@ match_alleles(dataset, ref_set, HQ_subset,
     \code{TRUE}. The standard column-names are \code{"SNP"},
     \code{"MINOR"}, \code{"MAJOR"} and \code{"MAF"}. Non-standard
     column names are accepted if a translation table is
-    specified in \code{header_reference}.}
+    specified in \code{header_reference}. All SNPs \emph{must}
+    be aligned to the positive strand.}
   \item{HQ_subset}{an \emph{optional} logical or numeric vector
     indicating the rows in \code{dataset} that contain high
     quality SNPs.}
@@ -73,6 +75,10 @@ match_alleles(dataset, ref_set, HQ_subset,
     configuration)?}
   \item{plot_FRQ}{logical; should a scatterplot of reported vs.
     reference allele-frequency be made?}
+  \item{plot_intensity}{logical; if \code{TRUE}, instead of a
+    scatterplot an intensity plot is generated. This option is
+    currently only partially implemented. Leave to \code{FALSE}
+    for now.}
   \item{plot_if_threshold}{logical; if \code{TRUE}, the
     scatterplot is only made when frequency correlation is below
     the threshold specified by \code{threshold_r}.}

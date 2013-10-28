@@ -34,7 +34,7 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
   check_header <- !missing(header_translations)
   if(check_header) {
     header_dat <- toupper(colnames(dataset))
-    header_col <- vector(mode = "integer", length = length(header_std))
+    header_col <- integer(length = length(header_std))
     for(forI in 1:length(header_std)) {
       header_cur <- identify_column(header_std[forI], header_translations, header_dat)
       if(length(header_cur) == 1L) { header_col[forI] <- header_cur
@@ -115,8 +115,8 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
   # Stage 1: creating filters & calculating lambda
   if(!is.null(c(FRQfilter_values, HWEfilter_values, calfilter_values, impfilter_values))) {
     if(col_N) {	if(any(is.na(dataset$N_TOTAL))) {
-      if (use_log) { save_log(phaseL = 4L, checkL = "QC statistics", typeL = "sample size", SNPL = sum(is.na(dataset$N_TOTAL)), allSNPs = dataN, actionL = "did not filter", noteL = "Missing sample-size: size-based filters will ignore or exclude these entries according to their 'filter_NA' setting", fileL = paste(save_dir, save_name, sep = "/"))
-      } else { print(paste(" - - Warning: missing sample sizes (", round(sum(is.na(dataset$N_TOTAL))/dataN, digits = 0), "% of SNPs) in dataset. Sample size filters will ignore or exclude these entries according to their respective 'filter_NA' setting."), quote = FALSE) }
+      if (use_log) { save_log(phaseL = 4L, checkL = "QC statistics", typeL = "sample size", SNPL = sum(is.na(dataset$N_TOTAL)), allSNPs = dataN, actionL = "did not filter", noteL = "Missing sample-size: size-based filters will ignore or exclude these entries according to their filter_NA setting", fileL = paste(save_dir, save_name, sep = "/"))
+      } else { print(paste(" - - Warning: missing sample sizes (", round(sum(is.na(dataset$N_TOTAL))/dataN, digits = 0), "% of SNPs) in dataset. Sample size filters will ignore or exclude these entries according to their respective filter_NA setting."), quote = FALSE) }
     } }
     flush.console()
     
@@ -128,7 +128,7 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
       
       input <- unique(c(...))
       if(length(input) > 5L) input <- input[1:5]
-      output <- vector(mode = "numeric", length = 0)
+      output <- numeric(length = 0)
       if(any(is.na(input) | input <= minimal_value)) {
         output <- c(output, minimal_value)
         if(any(is.na(input))) input[is.na(input)] <- minimal_value # removing NA's from input
@@ -139,20 +139,20 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
     }
     
     QQfilter_name <- function(var_name, filter_values, filter_NA = TRUE, minimal_value = 0, sign = ">=") {
-      name_list <- vector(mode = "character", length = length(filter_values))
+      name_list <- character(length = length(filter_values))
       for(fi in 1:length(filter_values)) {
         if(fi == 1 & filter_values[1] == minimal_value){
           if(filter_NA) {	name_list[1] <- "non-missing"
           } else {    		name_list[1] <- "all" }
         } else {
-          if(filter_values[fi] < 1) {	name_list[fi] <- paste(var_name, sign, " ", filter_values[fi], sep = "")
-          } else	{	      			    	name_list[fi] <- paste(var_name, sign, " ", filter_values[fi], "/N", sep = "") }
+          if(filter_values[fi] < 1) {	name_list[fi] <- paste0(var_name, sign, " ", filter_values[fi])
+          } else	{	      			    	name_list[fi] <- paste0(var_name, sign, " ", filter_values[fi], "/N") }
         }
       }
       return(name_list)
     }
     
-    QQfilter_data <- function(input_var, input_N, filter_values, filter_NA = TRUE, minimal_value = 0, two_sided = FALSE, subset = !vector(mode = "logical", length = length(input_var))) {
+    QQfilter_data <- function(input_var, input_N, filter_values, filter_NA = TRUE, minimal_value = 0, two_sided = FALSE, subset = !logical(length = length(input_var))) {
       filter_list <- matrix(data = FALSE, nrow = length(input_var), ncol = length(filter_values))
       if(filter_NA) {
         var_NA <- is.na(input_var)
@@ -191,7 +191,7 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
     }
     
     if(ignore_impstatus & !is.null(c(HWEfilter_values, calfilter_values, impfilter_values))) {
-      no_subset <- !vector(mode = "logical", length = dataN) }
+      no_subset <- !logical(length = dataN) }
   }
   
   # Filter for allele frequency
@@ -211,8 +211,8 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
       } else {		 useFRQfilter[which.max(FRQfilter_values) + 1] <- FRQfilter_N[which.max(FRQfilter_values) + 1] > 0 }
     }
     
-    FRQfilter_names	<- paste(QQfilter_name("", filter_values = FRQfilter_values, filter_NA = FRQfilter_NA),
-                             " (", round( ( 1 - FRQfilter_N/dataN) * 100), "%)", sep = "")
+    FRQfilter_names	<- paste0(QQfilter_name("", filter_values = FRQfilter_values, filter_NA = FRQfilter_NA),
+                              " (", round( ( 1 - FRQfilter_N/dataN) * 100), "%)")
     FRQfilter_out	<- QQfilter_name("MAF ", filter_values = FRQfilter_values, filter_NA = FRQfilter_NA, sign = "<")
   }
   
@@ -233,8 +233,8 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
       } else {		 useHWEfilter[which.max(HWEfilter_values) + 1] <- HWEfilter_N[which.max(HWEfilter_values) + 1] > 0 }
     }
     
-    HWEfilter_names	<- paste(QQfilter_name("", filter_values = HWEfilter_values, filter_NA = HWEfilter_NA),
-                             " (", round( ( 1 - HWEfilter_N/dataN) * 100), "%)", sep = "")
+    HWEfilter_names	<- paste0(QQfilter_name("", filter_values = HWEfilter_values, filter_NA = HWEfilter_NA),
+                              " (", round( ( 1 - HWEfilter_N/dataN) * 100), "%)")
     HWEfilter_out	<- QQfilter_name("HWE p-value ", filter_values = HWEfilter_values, filter_NA = HWEfilter_NA, sign = "<")
   }
   
@@ -255,8 +255,8 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
       } else {		 useCalfilter[which.max(calfilter_values) + 1] <- calfilter_N[which.max(calfilter_values) + 1] > 0 }
     }
     
-    calfilter_names	<- paste(QQfilter_name("", filter_values = calfilter_values, filter_NA = calfilter_NA),
-                             " (", round( ( 1 - calfilter_N/dataN) * 100), "%)", sep = "")
+    calfilter_names	<- paste0(QQfilter_name("", filter_values = calfilter_values, filter_NA = calfilter_NA),
+                              " (", round( ( 1 - calfilter_N/dataN) * 100), "%)")
     calfilter_out	<- QQfilter_name("call rate ", filter_values = calfilter_values, filter_NA = calfilter_NA, sign = "<")
   }
   
@@ -277,8 +277,8 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
       } else {		 useImpfilter[which.max(impfilter_values) + 1] <- impfilter_N[which.max(impfilter_values) + 1] > 0 }
     }
     
-    impfilter_names	<- paste(QQfilter_name("", filter_values = impfilter_values, filter_NA = impfilter_NA, minimal_value = impfilter_min),
-                             " (", round( ( 1 - impfilter_N/dataN) * 100), "%)", sep = "")
+    impfilter_names	<- paste0(QQfilter_name("", filter_values = impfilter_values, filter_NA = impfilter_NA, minimal_value = impfilter_min),
+                              " (", round( ( 1 - impfilter_N/dataN) * 100), "%)")
     impfilter_out	<- QQfilter_name("Imputation Q ", filter_values = impfilter_values, filter_NA = impfilter_NA, minimal_value = impfilter_min, sign = "<")
   }
   
@@ -364,9 +364,9 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
     QQplot_N <- sum(!is.null(FRQfilter_values), !is.null(HWEfilter_values), !is.null(calfilter_values), !is.null(impfilter_values))
     if(QQplot_N == 0L) QQplot_N <- 1L
 
-    jpeg(paste(save_dir, "/", save_name, "_graph_QQ.jpg", sep = ""),
-         width = if(QQplot_N == 4L) 1440 else QQplot_N * 720,
-         height= if(QQplot_N == 4L) 1440 else 720, res = 144)
+    png(paste0(save_dir, "/", save_name, "_graph_QQ.png"),
+        width = if(QQplot_N == 4L) 1440 else QQplot_N * 720,
+        height= if(QQplot_N == 4L) 1440 else 720, res = 144)
     par(mfrow = if(QQplot_N == 4L) c(2,2) else c(1, QQplot_N ))
     
     
@@ -477,7 +477,7 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
     print(" - - creating QQ plots (SKIPPED)", quote = FALSE)
     if(plot_QQ) {
       if(use_log) save_log(phaseL = 4L, checkL = "QQ plots", typeL = "insufficient data", SNPL = sum(QQ_incl), allSNPs = dataN, actionL = "Test skipped", noteL = "Insufficient significant p-values to create QQ plots", fileL = paste(save_dir, save_name, sep = "/"))
-      print(paste(" - - insufficient significant p-values (", sum(QQ_incl), " SNP with p =< ", plot_cutoff_p, ") to create QQ plots", sep = ""), quote = FALSE)
+      print(paste0(" - - insufficient significant p-values (", sum(QQ_incl), " SNP with p =< ", plot_cutoff_p, ") to create QQ plots"), quote = FALSE)
     }
   }
   
@@ -521,7 +521,7 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
                              size = c(247249719, 242951149, 199501827, 191273063, 180857866,	170899992,	158821424,	146274826,	140273252,	135374737,	134452384,	132349534,	114142980,	106368585,	100338915,	 88827254,	 78774742,	 76117153,	 63811651,	 62435964,	 46944323,	 49691432,	154913754,	 57772954,	0,	0,	0 ),
                              start= c(	 500000, 248249719, 491700868, 691702695, 883475758, 1064833624, 1236233616, 1395555040, 1542329866, 1683103118, 1818977855, 1953930239, 2086779773, 2201422753, 2308291338, 2409130253, 2498457507, 2577732249, 2654349402, 2718661053, 2781597017, 2829041340, 2879232772, 3034646526, NA, NA, NA))
       
-      new_pos <- vector(mode = "integer", length = manhattanN)
+      new_pos <- integer(length = manhattanN)
       for (mi in 1:24 ) new_pos <- ifelse(man_set$CHR==chr_size$chromosome[mi], chr_size[mi, 3] + man_set$POSITION, new_pos)
       
       use_Y	<- any(man_set$CHR == 24L)
@@ -554,7 +554,7 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
       manMax <- ceiling(-log10(min(man_set$PVALUE)))
       if(manMax < 10L) manMax <- 10L
       
-      jpeg(paste(save_dir, "/", save_name, "_graph_M.jpg", sep = ""),
+      png(paste0(save_dir, "/", save_name, "_graph_M.png"),
            width = 960, height = 480)
       par(mfrow = c(1,1), mgp = c(2.5, 0.9, 0))
       palette(c("red", "green3", "blue", "cyan"))
@@ -567,13 +567,13 @@ function(dataset, plot_QQ = TRUE, plot_Man = TRUE,
       dev.off()
     } else {
       if(use_log) save_log(phaseL = 4L, checkL = "Manhattan plot", typeL = "insufficient data", SNPL = manhattanN, allSNPs = dataN, actionL = "-", noteL = "Insufficient signif., unfiltered SNPs with known locations to create Manhattan plot", fileL = paste(save_dir, save_name, sep = "/"))
-      print(paste(" - - insufficient significant, unfiltered SNPs (N = ", manhattanN, ") with known location to create Manhattan plot", sep = ""), quote = FALSE)
+      print(paste0(" - - insufficient significant, unfiltered SNPs (N = ", manhattanN, ") with known location to create Manhattan plot"), quote = FALSE)
     }
   } else {
     print(" - - creating Manhattan plot (SKIPPED)", quote = FALSE)
     if(plot_Man) {
       if(use_log) { save_log(phaseL = 4L, checkL = "Manhattan plot", typeL = "insuf. data", SNPL = sum(QQ_incl), allSNPs = dataN, actionL = "Test skipped", noteL = "Insufficient significant p-values to create Manhattan plot", fileL = paste(save_dir, save_name, sep = "/"))
-      } else { print(paste(" - - insufficient significant p-values (", sum(QQ_incl), " SNP with p < ", plot_cutoff_p, ") to create Manhattan plot", sep = ""), quote = FALSE) }
+      } else { print(paste0(" - - insufficient significant p-values (", sum(QQ_incl), " SNP with p < ", plot_cutoff_p, ") to create Manhattan plot"), quote = FALSE) }
     }
     manfilter_N <- NA
     manhattanN	<- NA

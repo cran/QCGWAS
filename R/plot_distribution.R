@@ -17,7 +17,7 @@ function(data_table, names = 1:ncol(data_table), include = TRUE, plot_order = 1:
       for(medI in 1:plotN) quantL[medI, ] <- quantile(table2[ , medI], names = FALSE, na.rm = table1$N[medI] < pointN)[2:4]
     }
     
-    jpeg(paste(save_dir, "/", save_name, ".jpg", sep = ""), width = 400 + 80 * plotN, height = 480)
+    png(paste0(save_dir, "/", save_name, ".png"), width = 400 + 80 * plotN, height = 480)
     boxplot(table2[ , order(table1$order, na.last = FALSE)], names = table1$name[order(table1$order, na.last = FALSE)], ...)
     if(quantile_lines) abline(h = c(median(quantL[ ,1]), median(quantL[ ,2]), median(quantL[ ,3])), lty = 3)
     dev.off()
