@@ -259,7 +259,7 @@ function(ini_file,
                     "filter_FRQ", "filter_HWE",
                     "filter_cal", "filter_imp",
                     "FRQ_NA", "HWE_NA",
-                    "cal_NA", "imp_NA", "igore_impstatus") %in% colnames(ini_file)))
+                    "cal_NA", "imp_NA", "ignore_impstatus") %in% colnames(ini_file)))
     
     stopifnot(is.numeric(ini_file$filter_FRQ) | all(is.na(ini_file$filter_FRQ)),
               is.numeric(ini_file$filter_HWE) | all(is.na(ini_file$filter_HWE)),
@@ -269,7 +269,7 @@ function(ini_file,
               is.logical(ini_file$HWE_NA) & !any(is.na(ini_file$HWE_NA)),
               is.logical(ini_file$cal_NA) & !any(is.na(ini_file$cal_NA)),
               is.logical(ini_file$imp_NA) & !any(is.na(ini_file$imp_NA)),
-              is.logical(ini_file$igore_impstatus) & !any(is.na(ini_file$igore_impstatus)))
+              is.logical(ini_file$ignore_impstatus) & !any(is.na(ini_file$ignore_impstatus)))
     file_N <- nrow(ini_file)
   }
   
@@ -311,7 +311,8 @@ function(ini_file,
     use_HWE <- ini_file$HWE_NA[fi] | !is.na(ini_file$filter_HWE[fi])
     use_cal <- ini_file$cal_NA[fi] | !is.na(ini_file$filter_cal[fi])
     use_imp <- ini_file$imp_NA[fi] | !is.na(ini_file$filter_imp[fi])
-    use_impstatus <- if(ignore_impstatus[fi]) check_impstatus else use_HWE | use_cal | use_imp | check_impstatus
+    
+    use_impstatus <- if(ini_file$ignore_impstatus[fi]) check_impstatus else use_HWE | use_cal | use_imp | check_impstatus
     required_cols <- c("CHR","EFF_ALL_FREQ","HWE_PVAL","CALLRATE", "IMP_QUALITY", "IMPUTED")[
       c(use_Chr, use_FRQ, use_HWE, use_cal, use_imp, use_impstatus)]
     

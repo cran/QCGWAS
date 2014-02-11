@@ -476,7 +476,8 @@ function(filename, filename_output = paste0("QC_", filename),
   print(" - Checking alleles", quote = FALSE)
   flush.console()
   
-  iNA_al1_L0	<- sum(is.na(dataI$EFFECT_ALL))
+  iNA_al1_list <- is.na(dataI$EFFECT_ALL)
+  iNA_al1_L0	<- sum(iNA_al1_list)
   iNA_al2_list<-is.na(dataI$OTHER_ALL) | dataI$OTHER_ALL == "0" | dataI$OTHER_ALL == "-" | dataI$OTHER_ALL == "99"
   iNA_al2_N	<- sum(iNA_al2_list)
   
@@ -506,7 +507,19 @@ function(filename, filename_output = paste0("QC_", filename),
   # 1st phase-2 EmergencyExit: invalid or empty EFFECT_ALL/2 columns
   if(EmergencyExit) { return(emergency_return(name_in = filename_input, name_out = filename, LI = logI, LN = logN)) }
   
-  
+  # Removing spaces from alleles
+  if(iNA_al1_L0 > 0L) {
+    if(any(nchar(dataI$EFFECT_ALL) > 1L & !iNA_al1_list)) {
+      dataI$EFFECT_ALL <- gsub("(^ +)|( +$)", "", dataI$EFFECT_ALL) }
+  } else {
+    if(any(nchar(dataI$EFFECT_ALL) > 1L)) {
+      dataI$EFFECT_ALL <- gsub("(^ +)|( +$)", "", dataI$EFFECT_ALL) } }
+  if(iNA_al2_N > 0L) {
+    if(any(nchar(dataI$OTHER_ALL) > 1L & !iNA_al2_list)) {
+      dataI$OTHER_ALL <- gsub("(^ +)|( +$)", "", dataI$OTHER_ALL) }
+  } else {
+    if(any(nchar(dataI$OTHER_ALL) > 1L)) {
+      dataI$OTHER_ALL <- gsub("(^ +)|( +$)", "", dataI$OTHER_ALL) } }
   lwr_al1 <- which(dataI$EFFECT_ALL %in% c("a", "t", "c", "g"))
   lwr_al2 <- which(dataI$OTHER_ALL %in% c("a", "t", "c", "g"))
   if(length(lwr_al1) > 0L) { dataI$EFFECT_ALL[lwr_al1] <- toupper(dataI$EFFECT_ALL[lwr_al1])	}
@@ -524,6 +537,7 @@ function(filename, filename_output = paste0("QC_", filename),
   remove_L0	<- unique(c(which(iNA_al2_list | inv_al2_list | low_FRQ_list), same_al))
   monomorp_N <- length(remove_L0)
   
+  if(is.character(dataI$CHR)) { dataI$CHR <- gsub("(^ +)|( +$)", "", dataI$CHR) }
   dataI$CHR[dataI$CHR %in% c("X", "x")] <- 23L
   dataI$CHR[dataI$CHR %in% c("Y", "y")] <- 24L
   dataI$CHR[dataI$CHR %in% c("XY","xy", "Xy", "xY")]<- 25L
@@ -592,7 +606,7 @@ function(filename, filename_output = paste0("QC_", filename),
     }
   }
   
-  rm(iNA_al2_list, lwr_al1, lwr_al2, inv_al2_list, low_FRQ_list, same_al, remove_L0)
+  rm(iNA_al1_list, iNA_al2_list, lwr_al1, lwr_al2, inv_al2_list, low_FRQ_list, same_al, remove_L0)
   #	gc(verbose = FALSE) # memory cleaning
   
 
@@ -632,6 +646,8 @@ function(filename, filename_output = paste0("QC_", filename),
   #	values are stored in the "invalid" table (because without
   #	this parameter call rate, HWE-p & imputation quality are useless), although
   #	the inv_impstatus_N still counts only true invalids. 
+  if(is.character(dataI$IMPUTED)) {
+    dataI$IMPUTED <- gsub("(^ +)|( +$)", "", dataI$IMPUTED) }
   iNA_impstatus_N <- if(length(imputed_NA) == 0L) 0L else sum(dataI$IMPUTED %in% imputed_NA)
   if(iNA_impstatus_N == SNPn_preQC) {
     save_log(2L, "data integrity", "no imputation status", iNA_impstatus_N, SNPn_preQC, "-", "Imputation-status column contains no values!", filename_dir)
@@ -714,6 +730,7 @@ function(filename, filename_output = paste0("QC_", filename),
     print("CRITICAL ERROR: marker-name column contains non-character entries",quote=FALSE)
     save_log(2L, "data integrity", "SNP names", SNPn_preQC, SNPn_preQC, "QC aborted", paste0("Marker name is ", mode(dataI$MARKER)), filename_dir)
   } else {
+    dataI$MARKER <- gsub("(^ +)|( +$)", "", dataI$MARKER)
     dupli_list <- duplicated(dataI$MARKER)
     if(iNA_mar_N > 0L) {
       save_log(2L, "data integrity", "marker ID", iNA_mar_N, SNPn_preQC, "Markers removed", "Missing marker ID", filename_dir)
@@ -801,6 +818,7 @@ function(filename, filename_output = paste0("QC_", filename),
   # Testing strand_info
   strand_pre <- list(plus = 0L, minus = 0L, missing = sum(iNA$strand), invalid = 0L)
   if(is.character(dataI$STRAND) & strand_pre$missing != SNPn_preQC) {
+    dataI$STRAND <- gsub("(^ +)|( +$)", "", dataI$STRAND)
     if(strand_pre$missing > 0L) {
       strand_min <- dataI$STRAND == "-" & !iNA$strand
       inv$strand <- !(dataI$STRAND == "+" | strand_min | iNA$strand )
@@ -1655,7 +1673,7 @@ function(filename, filename_output = paste0("QC_", filename),
   if(SFL) {
     write.table(data.frame(
       v1 = c("Input File", "output File(s)", "QC Start Time", "QC End time", "Script version"),
-      v2 = "", v3 = c(filename_input, filename, start_time, date(), "1.0-7"),
+      v2 = "", v3 = c(filename_input, filename, start_time, date(), "1.0-8"),
       stringsAsFactors = FALSE),
                 logCon, quote = FALSE,
                 sep = "\t", row.names = FALSE, col.names = FALSE)
@@ -1663,7 +1681,7 @@ function(filename, filename_output = paste0("QC_", filename),
     write.table(format(
       data.frame(
         v1 = c("Input File", "output File(s)", "QC Start Time", "QC End time", "Script version"),
-        v2 = "\t: ", v3 = c(filename_input, filename, start_time, date(), "1.0-7"),
+        v2 = "\t: ", v3 = c(filename_input, filename, start_time, date(), "1.0-8"),
         stringsAsFactors = FALSE), justify = "left"),
                 logCon, quote = FALSE,
                 sep = "", row.names = FALSE, col.names = FALSE)
@@ -1776,18 +1794,19 @@ function(filename, filename_output = paste0("QC_", filename),
   
   stat_save <- function(stat_name, stat_col, old_N, old_NA, old_inv,
                         new_N = length(stat_col), new_NA = sum(is.na(stat_col)) - new_inv, new_inv,
-                        no_quantiles = FALSE) {
+                        no_quantiles = FALSE, round_min = FALSE) {
     if(no_quantiles | new_NA + new_inv == new_N) {
       return(c(stat_name, old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2), character(6) ))
     } else {
       quant <- quantile(stat_col, na.rm = new_NA + new_inv > 0L, names = FALSE)
-      return(c(stat_name, old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2), signif(quant[1], digits = 2), round(c(mean(stat_col, na.rm = new_NA + new_inv > 0L), quant)[c(3,1,4,5,6)], digits = 4)))
+      return(c(stat_name, old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2), if(round_min) round(quant[1], digits = 2) else signif(quant[1], digits = 2), round(c(mean(stat_col, na.rm = new_NA + new_inv > 0L), quant)[c(3,1,4,5,6)], digits = 4)))
     }
   }
   stat_select_save <- function(stat_name, select_name,
                                stat_col, NA_col = is.na(stat_col) & !inv_col, inv_col, select_col,
                                old_N, old_NA, old_inv,
-                               new_N = sum(select_col), new_NA = sum(select_col & NA_col), new_inv = sum(select_col & inv_col) ) {
+                               new_N = sum(select_col), new_NA = sum(select_col & NA_col), new_inv = sum(select_col & inv_col),
+                               round_min = FALSE) {
     if(old_N == 0L) {
       return(c(paste(stat_name, "-", select_name), "-", "-", "-", "-", "-", "-", character(6)))
     } else {
@@ -1800,7 +1819,7 @@ function(filename, filename_output = paste0("QC_", filename),
           return(c(paste(stat_name, "-", select_name), old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2), character(6)))
         } else {
           quant <- quantile(stat_col[select_col], na.rm = new_NA + new_inv > 0L, names = FALSE)
-          return(c(paste(stat_name, "-", select_name), old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2), signif(quant[1], digits = 2), round(c(mean(stat_col[select_col], na.rm = new_NA + new_inv > 0L), quant)[c(3,1,4,5,6)], digits = 4)))
+          return(c(paste(stat_name, "-", select_name), old_NA, old_inv, round(100*(old_NA + old_inv)/old_N, digits = 2), new_NA, new_inv, round(100*(new_NA + new_inv)/new_N, digits = 2), if(round_min) round(quant[1], digits = 2) else signif(quant[1], digits = 2), round(c(mean(stat_col[select_col], na.rm = new_NA + new_inv > 0L), quant)[c(3,1,4,5,6)], digits = 4)))
         } } }
   }
   
@@ -1818,11 +1837,11 @@ function(filename, filename_output = paste0("QC_", filename),
                                        select_col = geno_list,	old_N = SNPn_preQC_geno, old_NA = iNA_cal_g, old_inv = inv_cal_g, new_N = SNPn_postQC_geno)
   stat_table[12, ] <- stat_select_save(stat_name = "Call rate", select_name = "imputed", stat_col = dataI$CALLRATE, NA_col = iNA$cal, inv_col = inv$cal,
                                        select_col =	imp_list,	old_N = SNPn_preQC_imp, old_NA = iNA_cal_i, old_inv = inv_cal_i, new_N = SNPn_postQC_imp)
-  stat_table[13, ] <- stat_save(stat_name = "Sample size", stat_col = dataI$N_TOTAL, old_N = SNPn_preQC, old_NA = iNA_N_N, old_inv = inv_N_N, new_N = SNPn_postQC, new_NA = sum(iNA$N), new_inv = sum(inv$N))
+  stat_table[13, ] <- stat_save(stat_name = "Sample size", stat_col = dataI$N_TOTAL, old_N = SNPn_preQC, old_NA = iNA_N_N, old_inv = inv_N_N, new_N = SNPn_postQC, new_NA = sum(iNA$N), new_inv = sum(inv$N), round_min = TRUE)
   stat_table[14, ] <- stat_select_save(stat_name = "Sample size", select_name = "genotyped", stat_col = dataI$N_TOTAL, NA_col = iNA$N, inv_col = inv$N,
-                                       select_col = geno_list,	old_N = SNPn_preQC_geno, old_NA = iNA_N_g, old_inv = inv_N_g, new_N = SNPn_postQC_geno)
+                                       select_col = geno_list,	old_N = SNPn_preQC_geno, old_NA = iNA_N_g, old_inv = inv_N_g, new_N = SNPn_postQC_geno, round_min = TRUE)
   stat_table[15, ] <- stat_select_save(stat_name = "Sample size", select_name = "imputed", stat_col = dataI$N_TOTAL, NA_col = iNA$N, inv_col = inv$N,
-                                       select_col =	imp_list,	old_N = SNPn_preQC_imp, old_NA = iNA_N_i, old_inv = inv_N_i, new_N = SNPn_postQC_imp)
+                                       select_col =	imp_list,	old_N = SNPn_preQC_imp, old_NA = iNA_N_i, old_inv = inv_N_i, new_N = SNPn_postQC_imp, round_min = TRUE)
   stat_table[16, ] <- stat_save(stat_name = "Imputation quality", stat_col = dataI$IMP_QUALITY, old_N = SNPn_preQC, old_NA = iNA_impQ_N, old_inv = inv_impQ_N, new_N = SNPn_postQC, new_NA = sum(iNA$impQ), new_inv = sum(inv$impQ))
   stat_table[17, ] <- stat_select_save(stat_name = "Imp. quality", select_name = "genotyped", stat_col = dataI$IMP_QUALITY, NA_col = iNA$impQ, inv_col = inv$impQ,
                                        select_col = geno_list,	old_N = SNPn_preQC_geno, old_NA = iNA_impQ_g, old_inv = inv_impQ_g, new_N = SNPn_postQC_geno)
@@ -1912,8 +1931,8 @@ function(filename, filename_output = paste0("QC_", filename),
                            stat1 = c(round(outcome_P, digits = 3), round(plot_output$lambda, digits = 3), "", ""),
                            em2 = character(length = 6),
                            name2 = c("SE median", "Skewness", "Kurtosis", "Visscher's stat.", "* high-quality SNPs", "   only"),
-                           stat2all = c(stat_SE, stat_skewness, stat_kurtosis, stat_Visscher, "", ""),
-                           stat2_HQ = c(stat_SE_HQ, stat_skewness_HQ, stat_kurtosis_HQ, stat_Vissc_HQ, "", ""),
+                           stat2all = c(signif(stat_SE, digits = 3), round(c(stat_skewness, stat_kurtosis, stat_Visscher), digits = 3), "", ""),
+                           stat2_HQ = c(signif(stat_SE_HQ, digits = 3), round(c(stat_skewness_HQ, stat_kurtosis_HQ, stat_Vissc_HQ), digits = 3), "", ""),
                            em3 = character(length = 6),
                            Nname = c("Negative strand SNPs", "High-quality SNPs", "Corrected p-values", "Extreme p-values", "", ""),
                            NN = c(strand_post$minus, SNPn_postQC_HQ, calc_p_newN, low_p_newN, NA, NA),

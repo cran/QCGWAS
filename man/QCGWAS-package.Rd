@@ -11,8 +11,8 @@
 \tabular{ll}{
 Package: \tab QCGWAS\cr
 Type: \tab Package\cr
-Version: \tab 1.0-7\cr
-Date: \tab 2013-10-28\cr
+Version: \tab 1.0-8\cr
+Date: \tab 2014-02-11\cr
 License: \tab GPL (>= 3)\cr
 }
   The core of the package is the function \code{\link{QC_GWAS}}.

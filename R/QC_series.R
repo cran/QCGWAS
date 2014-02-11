@@ -336,6 +336,8 @@ function(data_files, datafile_tag, output_filenames,
         label_names <- substr(temp_names, 1, ifelse(posdot == nchar(temp_names), posdot, posdot - 1L))
       }
       
+      if(any(nchar(label_names) > 15)) label_names <- table_plot$no      
+      
       if(plot_SE) {
         print(" - Creating scatterplot Standard Error vs Sample Size", quote = FALSE)
         flush.console()
