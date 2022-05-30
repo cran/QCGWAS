@@ -1673,7 +1673,7 @@ function(filename, filename_output = paste0("QC_", filename),
   if(SFL) {
     write.table(data.frame(
       v1 = c("Input File", "output File(s)", "QC Start Time", "QC End time", "Script version"),
-      v2 = "", v3 = c(filename_input, filename, start_time, date(), "1.0-8"),
+      v2 = "", v3 = c(filename_input, filename, start_time, date(), "1.0-9"),
       stringsAsFactors = FALSE),
                 logCon, quote = FALSE,
                 sep = "\t", row.names = FALSE, col.names = FALSE)
@@ -1681,7 +1681,7 @@ function(filename, filename_output = paste0("QC_", filename),
     write.table(format(
       data.frame(
         v1 = c("Input File", "output File(s)", "QC Start Time", "QC End time", "Script version"),
-        v2 = "\t: ", v3 = c(filename_input, filename, start_time, date(), "1.0-8"),
+        v2 = "\t: ", v3 = c(filename_input, filename, start_time, date(), "1.0-9"),
         stringsAsFactors = FALSE), justify = "left"),
                 logCon, quote = FALSE,
                 sep = "", row.names = FALSE, col.names = FALSE)

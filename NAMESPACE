@@ -1,1 +1,14 @@
-exportPattern("^[[:alpha:]]+")
+export("calc_kurtosis", "calc_skewness", "check_P", "convert_impstatus", "create_hapmap_reference",
+       "filter_GWAS", "histogram_series", "HQ_filter",
+       "identify_column", "intensity_plot", "load_GWAS", "load_test", "match_alleles",
+       "plot_distribution", "plot_precision", "plot_regional", "plot_skewness", "QC_GWAS", "QC_histogram",
+       "QC_plots", "QC_series", "QQ_plot", "QQ_series", "save_log", "switch_strand", "translate_header")
+importFrom("grDevices", "dev.off", "palette", "png")
+importFrom("graphics", "abline", "axis", "boxplot", "hist", "legend",
+           "lines", "mtext", "par", "points", "polygon", "text",
+           "title")
+importFrom("stats", "cor", "median", "pchisq", "ppoints", "qbeta",
+           "qchisq", "qnorm", "quantile", "sd")
+importFrom("utils", "download.file", "flush.console", "read.table",
+           "write.table")
+importFrom("methods", "is")

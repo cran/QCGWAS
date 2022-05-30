@@ -81,8 +81,10 @@ create_hapmap_reference(dir = getwd(),
   # sufficient disk space and a reasonably fast internet
   # connection.
 
-  #new_hapmap <- create_hapmap_reference(dir = "C:/new_hapmap",
-  # download_hapmap = TRUE, download_subset = "CEU",
-  # filename = "new_hapmap", save_txt = TRUE,
-  # return_reference = TRUE)
+  \dontrun{
+    new_hapmap <- create_hapmap_reference(dir = "C:/new_hapmap",
+                                download_hapmap = TRUE, download_subset = "CEU",
+                                filename = "new_hapmap", save_txt = TRUE,
+                                return_reference = TRUE)
+  }
 }

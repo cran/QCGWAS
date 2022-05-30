@@ -117,17 +117,19 @@ QQ_series(dataset, save_name = "dataset", save_dir = getwd(),
   the p expected from the effect size and standard error.
 }
 \examples{
-  data("gwa_sample")
-
-  QQ_plot(dataset = gwa_sample,
-          save_name = "sample_QQ",
-          filter_FRQ = 0.01, filter_cal = 0.95,
-          filter_NA = FALSE)
-
-  QQ_series(dataset = gwa_sample,
+  \dontrun{
+    data("gwa_sample")
+  
+    QQ_plot(dataset = gwa_sample,
             save_name = "sample_QQ",
-            filter_FRQ = c(NA, 0.01, 0.01),
-            filter_cal = c(NA, 0.95, 0.95),
-            filter_NA = c(FALSE, FALSE, TRUE))
+            filter_FRQ = 0.01, filter_cal = 0.95,
+            filter_NA = FALSE)
+  
+    QQ_series(dataset = gwa_sample,
+              save_name = "sample_QQ",
+              filter_FRQ = c(NA, 0.01, 0.01),
+              filter_cal = c(NA, 0.95, 0.95),
+              filter_NA = c(FALSE, FALSE, TRUE))
+  }
 }
 \keyword{distribution}

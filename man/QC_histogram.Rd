@@ -116,6 +116,7 @@ histogram_series(dataset, data_col = 1,
 \value{Both functions return an invisible value \code{NULL}.}
 \seealso{For creating QQ plots: \code{\link{QQ_plot}}.}
 \examples{
+\dontrun{
   data("gwa_sample")
 
   QC_histogram(dataset = gwa_sample, data_col = "EFFECT",
@@ -129,5 +130,5 @@ histogram_series(dataset, data_col = 1,
              filter_FRQ = c(NA, 0.01, 0.01),
              filter_cal = c(NA, 0.95, 0.95),
              filter_NA = c(FALSE, FALSE, TRUE))
-}
+}}
 \keyword{distribution}

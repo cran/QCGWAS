@@ -187,6 +187,7 @@ QC_plots(dataset,
   \code{\link{QQ_plot}} for generating simpler QQ plots.
 }
 \examples{
+  \dontrun{
   data("gwa_sample")
 
   QC_plots(dataset = gwa_sample,
@@ -195,6 +196,7 @@ QC_plots(dataset,
     calfilter_values = c(NA, 0.95, 0.99),
     manfilter_FRQ = 0.05, manfilter_cal = 0.95,
     filter_NA = TRUE, save_name = "sample_plots")
+    }
 }
 \keyword{distribution}
 \keyword{univar}

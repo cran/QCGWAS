@@ -2,7 +2,7 @@
 \alias{QCGWAS-package}
 \alias{QCGWAS}
 \docType{package}
-\title{Quality Control of Genome Wide Association Study results}
+\title{Quality Control of Genome Wide Association Study Results}
 \description{
   Functions for automated and manual quality control of Genome
   Wide Association Study results.
@@ -11,8 +11,8 @@
 \tabular{ll}{
 Package: \tab QCGWAS\cr
 Type: \tab Package\cr
-Version: \tab 1.0-8\cr
-Date: \tab 2014-02-11\cr
+Version: \tab 1.0-9\cr
+Date: \tab 2022-05-30\cr
 License: \tab GPL (>= 3)\cr
 }
   The core of the package is the function \code{\link{QC_GWAS}}.
@@ -39,9 +39,9 @@ Maintainer: Peter J. van der Most <p.j.van.der.most@umcg.nl>
 }
 \references{
   Van der Most, P.J., Vaez, A., Prins, B.P., Loretto Munoz, M.,
-  Snieder, H., Alizadeh, B.Z. & Nolte, I.M. (In preparation).
+  Snieder, H., Alizadeh, B.Z. & Nolte, I.M. (2014).
   QCGWAS: A flexible R package for automated quality control of
-  Genome-Wide Association results.
+  Genome-Wide Association results. Bioinformatics 30(8):1185-1186.
 }
 \keyword{ package }
 \seealso{

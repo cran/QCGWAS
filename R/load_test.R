@@ -14,7 +14,7 @@ function(filename, dir = getwd(), column_separators = c("\t", " ", "", ",", ";")
   
   for(countI in 1:length(column_separators)) {
     tryI <- try(ncol(read.table(eval(file_cal), sep = column_separators[countI], nrows = test_nrows, ...) ), silent = TRUE)
-    if(class(tryI) == "try-error") { load_error <- tryI
+    if(is(tryI, "try-error")) { load_error <- tryI
     } else {
       if(tryI < 5L) { load_error <- "insufficient columns"
       } else {

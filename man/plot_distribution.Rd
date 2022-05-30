@@ -52,7 +52,24 @@ plot_distribution(data_table,
   For other plots comparing GWAS results files:
   \code{\link{plot_precision}} and \code{\link{plot_skewness}}.
 }
+\note{
+  There is a known bug with this function when called by
+  \code{\link{QC_series}}. As input for \code{names},
+  \code{QC_series} pastes together a shortened filename and a
+  \code{"N = x"} string giving the dataset's sample size.
+  
+  The filenames are truncated to the first unique element; e.g.
+  files \code{"cohortX_male_HB.txt"} and
+  \code{"cohortX_female_HB.txt"} become
+  \code{"cohortX_male; N = 608"} and
+  \code{"cohortX_female; N = 643"}, respectively. However, if
+  the unique element is longer than approx. 15 characters,
+  the label is too long to be plotted. The only solution is to
+  change the filenames prior to passing the files to
+  \code{QC_series}.
+}
 \examples{
+\dontrun{
   data("gwa_sample")
 
   chunk1 <- gwa_sample$EFFECT[1:1000]
@@ -64,5 +81,6 @@ plot_distribution(data_table,
     names = c("chunk 1", "chunk 2", "chunk 3"),
     quantile_lines = TRUE,
     save_name = "sample_distribution")
+    }
 }
 \keyword{distribution}

@@ -703,11 +703,6 @@ QC_series(data_files, datafile_tag, output_filenames,
   files are tab-delimited and are best viewed in a spreadsheet
   program. The most important one is the log file. This file
   summarizes the results of the QC and the data inside the file.
-  [Note: as of version 1.0-7, the format of the log file has
-  been changed to make it readable in simple text editors. To
-  restore the old format, set the
-  \code{spreadsheet_friendly_log} argument to \code{TRUE}. The
-  format of the other .txt output files is unchanged.]
   
   \emph{The log file}
   
@@ -840,9 +835,7 @@ QC_series(data_files, datafile_tag, output_filenames,
   important QC stats of the various files side by side, and
   (depending on the plot-arguments) several graphs comparing
   effect-size distribution, precision and skewness vs. kurtosis
-  of the QC'ed files. The datapoints will be labeled with either
-  the filename or a number corresponding to the first column of
-  the \code{Checkgraph_legenda.txt} file.
+  of the QC'ed files.
 }
 \section{Output header}{
   The standard-format values used by \code{out_header} are:
@@ -874,10 +867,6 @@ QC_series(data_files, datafile_tag, output_filenames,
   Read the documentation of the auto-loader function
   \code{\link{load_GWAS}} for more information.
   
-  Note that, after loading the dataset, \code{QC_GWAS} removes
-  any white-space characters remaining in the character
-  variables before proceeding with phase 2.
-  
   Chromosome values can be coded as numeric or character: 
   values of \code{"X"}, \code{"Y"}, \code{"XY"} and
   \code{"M"} will automatically be converted to \code{23},
@@ -901,10 +890,10 @@ QC_series(data_files, datafile_tag, output_filenames,
   removed in phase 2d, while values of \code{-1} will be set to
   \code{NA}. Effect sizes of \code{-1} are accepted, unless the
   standard error and/or the p value are also \code{-1}, in which
-  case it is also set to \code{NA}.
+  case it is also set to \code{NA}.  
 }
 \section{Filter arguments}{
-  \code{QC_GWAS} has three sets of arguments relating to filters:
+  \code{QC_GWAS} has three sets arguments relating to filters:
   the arguments for the HQ (high-quality), QQ (plot) and NA
   (missing values) filters. The HQ and QQ arguments work
   mostly in the same way, but there are a few key differences.
@@ -1006,7 +995,7 @@ QC_series(data_files, datafile_tag, output_filenames,
   Also, if one wants to QC a large number of files for a meta-GWAS,
   one should use the same alternative allele reference file (and
   let \code{QC_GWAS} update it) for every file, otherwise it is
-  possible  that rs31 may have a different effect alleles in some
+  possible  that rs13 may have a different effect alleles in some
   post-QC files.
 }
 \seealso{

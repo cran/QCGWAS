@@ -4,17 +4,18 @@ citEntry(entry = "Article",
          title = "QCGWAS: A flexible R package for automated quality
                   control of Genome-Wide Association results",
          journal = "Bioinformatics",
-         volume = "In press",
-         number = "",
-         pages = "",
+         volume = "30",
+         number = "8",
+         pages = "1185-1186",
          year = "2014",
          author = "Peter J. van der Most, Ahmad Vaez, Bram P. Prins,
                    M. Loretto Munoz, Harold Snieder,
                    Behrooz Z. Alizadeh and Ilja M. Nolte",
-         note = "doi: 10.1093/bioinformatics/btt745",
+         doi = "10.1093/bioinformatics/btt745",
+         url = "https://doi.org/10.1093/bioinformatics/btt745",
          textVersion = "Van der Most, P.J., Vaez, A., Prins, B.P.,
                         Munoz, M.L., Snieder, H., Alizadeh, B.Z. &
-                        Nolte, I.M. (In press) QCGWAS: A flexible R
+                        Nolte, I.M. (2014) QCGWAS: A flexible R
                         package for automated quality control of
                         Genome-Wide Association results.
                         Bioinformatics."

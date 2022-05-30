@@ -64,8 +64,15 @@ check_P(dataset, HQ_subset,
                              FRQ_val = 0.05,
                              cal_val = 0.95,
                              filter_NA = FALSE)
+  # To calculate a correlation between predicted and actual p-values:
   check_P(gwa_sample, HQ_subset = selected_SNPs,
-          plot_correlation = TRUE, plot_if_threshold = FALSE,
-          save_name = "sample")
+          plot_correlation = FALSE)
+  
+  # To plot the correlation:
+  \dontrun{
+    check_P(gwa_sample, HQ_subset = selected_SNPs,
+            plot_correlation = TRUE, plot_if_threshold = FALSE,
+            save_name = "sample")
+  }
 }
 \keyword{univar}

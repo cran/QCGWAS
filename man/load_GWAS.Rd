@@ -98,9 +98,11 @@ load_test(filename, dir = getwd(),
   ## Because this is a demonstration, the nrows argument is used
   ## to read only the first 100 rows.
   
-  # data_GWAS <-
-  #    load_GWAS("GWA_results1.txt.zip",
-  #              dir = "C:/GWAS_results",
-  #              nrows = 100)
+  \dontrun{
+   data_GWAS <-
+      load_GWAS("GWA_results1.txt.zip",
+                dir = "C:/GWAS_results",
+                nrows = 100)
+  }
 }
 \keyword{files}
